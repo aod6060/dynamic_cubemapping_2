@@ -13,6 +13,7 @@
 #include <algorithm>
 #include <random>
 #include <chrono>
+#include <filesystem>
 
 #include <SDL/SDL.h>
 #include <SDL/SDL_image.h>

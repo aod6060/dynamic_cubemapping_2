@@ -17,10 +17,31 @@ namespace app {
 	// Library
 	struct Library {
 		HINSTANCE library = nullptr;
-		module_init_def init;
-		module_update_def update;
-		module_render_def render;
-		module_release_def release;
+		module_init_def init = nullptr;
+		module_update_def update = nullptr;
+		module_render_def render = nullptr;
+		module_release_def release = nullptr;
+
+		void initLibrary(std::string path) {
+			this->library = LoadLibrary(path.c_str());
+
+			this->init = (module_init_def)GetProcAddress(_library.library, "demo_init");
+			this->update = (module_update_def)GetProcAddress(_library.library, "demo_update");
+			this->render = (module_render_def)GetProcAddress(_library.library, "demo_render");
+			this->release = (module_release_def)GetProcAddress(_library.library, "demo_release");
+
+		}
+
+		void releaseLibrary() {
+			FreeLibrary(this->library);
+
+			this->init = nullptr;
+			this->update = nullptr;
+			this->render = nullptr;
+			this->release = nullptr;
+
+		}
+
 	} _library;
 
 	// Function Table
@@ -63,14 +84,30 @@ namespace app {
 
 		if (_conf->rtp_config.isDeveloper) {
 			// Implement Later
+			// loading build file
+			std::ifstream in(_conf->rtp_config.build_file, std::ios::binary);
+			in.read((char*)&_buildRef.version, sizeof(uint64_t));
+			in.close();
+
+			std::cout << "Build: " << _buildRef.version << std::endl;
+
+			// Copy module_dll -> module_test_dll
+			std::filesystem::path module_dll_path = _conf->rtp_config.module_dll;
+			std::filesystem::path module_test_dll_path = _conf->rtp_config.module_test_dll;
+
+			if (std::filesystem::exists(module_test_dll_path)) {
+				std::filesystem::remove(module_test_dll_path);
+				std::filesystem::copy_file(module_dll_path, module_test_dll_path);
+			}
+			else {
+				std::filesystem::copy_file(module_dll_path, module_test_dll_path);
+			}
+
+			// Loading module_test_dll instead
+			_library.initLibrary(_conf->rtp_config.module_test_dll);
 		}
 		else {
-			_library.library = LoadLibrary(_conf->rtp_config.module_dll.c_str());
-
-			_library.init = (module_init_def)GetProcAddress(_library.library, "demo_init");
-			_library.update = (module_update_def)GetProcAddress(_library.library, "demo_update");
-			_library.render = (module_render_def)GetProcAddress(_library.library, "demo_render");
-			_library.release = (module_release_def)GetProcAddress(_library.library, "demo_release");
+			_library.initLibrary(_conf->rtp_config.module_dll);
 		}
 
 		if (_library.init) {
@@ -96,6 +133,58 @@ namespace app {
 				}
 			}
 
+
+			if (_conf->rtp_config.isDeveloper) {
+				// Periodically Check if version changes
+				if (_buildRef.timer <= 0.0f) {
+					uint64_t v;
+					std::ifstream in(_conf->rtp_config.build_file, std::ios::binary);
+					in.read((char*)&v, sizeof(uint64_t));
+					in.close();
+
+					if (v != _buildRef.version) {
+						_buildRef.needsRefresh = true;
+						_buildRef.version = v;
+					}
+
+					_buildRef.timer = _buildRef.maxTimer;
+				}
+				else {
+					_buildRef.timer -= delta;
+				}
+
+				if (_buildRef.needsRefresh) {
+					if (_library.release) {
+						_library.release();
+					}
+
+					std::cout << "Build: " << _buildRef.version << std::endl;
+
+					_library.releaseLibrary();
+
+					// Copy module_dll -> module_test_dll
+					std::filesystem::path module_dll_path = _conf->rtp_config.module_dll;
+					std::filesystem::path module_test_dll_path = _conf->rtp_config.module_test_dll;
+
+					if (std::filesystem::exists(module_test_dll_path)) {
+						std::filesystem::remove(module_test_dll_path);
+						std::filesystem::copy_file(module_dll_path, module_test_dll_path);
+					}
+					else {
+						std::filesystem::copy_file(module_dll_path, module_test_dll_path);
+					}
+
+					_library.initLibrary(_conf->rtp_config.module_test_dll);
+
+
+					if (_library.init) {
+						_library.init(&_func_table);
+					}
+
+					_buildRef.needsRefresh = false;
+				}
+			}
+
 			if (_library.update) {
 				_library.update(delta);
 			}
@@ -114,12 +203,12 @@ namespace app {
 			_library.release();
 		}
 
-		FreeLibrary(_library.library);
+		_library.releaseLibrary();
 
-		_library.init = nullptr;
-		_library.update = nullptr;
-		_library.render = nullptr;
-		_library.release = nullptr;
+		if (_conf->rtp_config.isDeveloper) {
+			std::filesystem::path p = _conf->rtp_config.module_test_dll;
+			std::filesystem::remove(p);
+		}
 
 		SDL_GL_DeleteContext(_context);
 		SDL_DestroyWindow(_window);

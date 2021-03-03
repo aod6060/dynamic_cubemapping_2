@@ -1,12 +1,17 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
-std::string path = "build.bin";
+std::string path = "E:\\demo\\dynamic_cubemapping_2\\bin\\";
 
-int main() {
+int main(int argc, char** argv) {
 	uint64_t build = 0;
 
-	std::ifstream in(path, std::ios::binary);
+	std::stringstream ss;
+
+	ss << path << argv[1];
+
+	std::ifstream in(ss.str(), std::ios::binary);
 
 	if (in.good()) {
 		in.read((char*)&build, sizeof(uint64_t));
@@ -17,7 +22,7 @@ int main() {
 
 	std::cout << "Build: " << build << std::endl;
 
-	std::ofstream out(path, std::ios::binary);
+	std::ofstream out(ss.str(), std::ios::binary);
 
 	out.write((char*)&build, sizeof(uint64_t));
 	out.close();

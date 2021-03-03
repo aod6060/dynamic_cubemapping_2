@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
 	conf.width = 1280;
 	conf.height = 720;
 
-	conf.rtp_config.isDeveloper = false;
+	conf.rtp_config.isDeveloper = true;
 	conf.rtp_config.module_dll = "demo.dll";
 	conf.rtp_config.module_test_dll = "demo_test.dll";
 	conf.rtp_config.build_file = "build.bin";
