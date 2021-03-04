@@ -79,6 +79,7 @@ namespace app {
 		_context = SDL_GL_CreateContext(_window);
 		glewInit();
 
+		input::init();
 
 		ft::init(&_func_table);
 
@@ -131,6 +132,8 @@ namespace app {
 				if (e.type == SDL_QUIT) {
 					_isRunning = false;
 				}
+
+				input::doEvent(e);
 			}
 
 
@@ -193,6 +196,8 @@ namespace app {
 				_library.render();
 			}
 
+			input::update();
+
 			SDL_GL_SwapWindow(_window);
 		}
 	}
@@ -210,6 +215,9 @@ namespace app {
 			std::filesystem::remove(p);
 		}
 
+		ft::release(&_func_table);
+
+		
 		SDL_GL_DeleteContext(_context);
 		SDL_DestroyWindow(_window);
 		SDL_Quit();
