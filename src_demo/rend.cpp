@@ -414,5 +414,34 @@ namespace rend {
 			GL_UNSIGNED_BYTE,
 			nullptr);
 	}
+
+
+	void createTexture2D(
+		Texture2D& out,
+		std::string path,
+		uint32_t minFilter,
+		uint32_t magFilter,
+		bool generateMipmaps) {
+
+		image::Image t;
+
+		t.init(path);
+
+		out.init();
+
+		out.bind(GL_TEXTURE0);
+
+		out.update(t);
+
+		out.parameteri(GL_TEXTURE_MAG_FILTER, magFilter);
+		out.parameteri(GL_TEXTURE_MIN_FILTER, minFilter);
+
+		if (generateMipmaps) {
+			out.genMipmaps();
+		}
+
+		out.unbind(GL_TEXTURE0);
+		t.release();
+	}
 }
 

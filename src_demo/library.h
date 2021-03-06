@@ -172,6 +172,15 @@ namespace rend {
 		void update(image::Image& image);
 		void update(uint32_t width, uint32_t height, uint32_t bbp);
 	};
+
+
+	void createTexture2D(
+		Texture2D& out,
+		std::string path,
+		uint32_t minFilter,
+		uint32_t magFilter,
+		bool generateMipmaps);
+
 }
 
 
@@ -181,6 +190,11 @@ namespace mesh {
 		glm::vec3 vertex;
 		glm::vec2 texCoord;
 		glm::vec3 normal;
+	};
+
+	struct Tangent {
+		glm::vec3 tangent;
+		glm::vec3 biTangent;
 	};
 
 	struct Triangle {
@@ -193,7 +207,55 @@ namespace mesh {
 		uint32_t version;
 		std::vector<Vertex> vertices;
 		std::vector<Triangle> triangles;
+		std::vector<Tangent> tangents;
 	};
 
 	void init(std::string path, Mesh& mesh);
+
+	struct OpenGLMesh {
+		Mesh mesh;
+
+		rend::VertexBuffer vertices;
+		rend::VertexBuffer texCoords;
+		rend::VertexBuffer normals;
+		rend::VertexBuffer tangents;
+		rend::VertexBuffer biTangents;
+
+		rend::IndexBuffer index;
+
+		void init(std::string path);
+		void release();
+	};
+}
+
+namespace transform {
+
+
+	struct Camera {
+		glm::vec3 position;
+		glm::vec2 rotation;
+
+		float fov;
+		float aspect;
+		float zmin;
+		float zmax;
+
+		float walk_speed = 32.0f;
+		float rot_speed = 64.0f;
+
+		void init(
+			glm::vec3 position,
+			glm::vec2 rotation,
+			float fov,
+			float aspect,
+			float zmin,
+			float zmax);
+
+		void update(float delta);
+
+		glm::mat4 toProj();
+		glm::mat4 toView();
+
+	};
+
 }

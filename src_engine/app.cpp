@@ -156,6 +156,11 @@ namespace app {
 					_buildRef.timer -= delta;
 				}
 
+				if (input::isKeyPressOnce(input::Keys::KEY_F1)) {
+					_buildRef.needsRefresh = true;
+					_buildRef.timer = _buildRef.maxTimer;
+				}
+
 				if (_buildRef.needsRefresh) {
 					if (_library.release) {
 						_library.release();
