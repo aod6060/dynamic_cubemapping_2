@@ -11,6 +11,7 @@ layout(location = 4) in vec3 biTangents;
 layout(std140) uniform Matrices {
     mat4 proj;
     mat4 view;
+    mat4 lightSpaceMatrix;
 };
 
 layout(std140) uniform Light {
@@ -35,18 +36,24 @@ out vec3 v_mpos;
 out vec3 v_LightDir;
 out vec3 v_ViewDir;
 out mat3 v_TBN;
+out vec3 v_norm;
+out vec4 v_FragPosLightSpace;
 
 void main() {
     gl_Position = proj * view * model * vec4(vertices, 1.0);
     v_TexCoords = texCoords;
     //v_Normals = normalize(mat3(normalMatrix) * normals);
 
-    v_mpos = mat3(model) * vertices;
+    v_mpos = vec3(model * vec4(vertices, 1.0));
     v_LightDir = normalize(-direction);
     v_ViewDir = normalize(cameraPos - v_mpos);
 
     vec3 T = normalize(mat3(normalMatrix) * tangents);
     vec3 B = normalize(mat3(normalMatrix) * biTangents);
     vec3 N = normalize(mat3(normalMatrix) * normals);
+
     v_TBN = mat3(T, B, N);
+    v_norm = N;
+
+    v_FragPosLightSpace = lightSpaceMatrix * vec4(v_mpos, 1.0);
 }

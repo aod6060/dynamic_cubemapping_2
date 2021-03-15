@@ -68,8 +68,8 @@ void loadAssimpMesh(std::string path, mesh::Mesh& mh) {
 	for (int i = 0; i < m->mNumFaces; i++) {
 		mesh::Triangle t;
 		t.v1 = m->mFaces[i].mIndices[0];
-		t.v2 = m->mFaces[i].mIndices[2];
-		t.v3 = m->mFaces[i].mIndices[1];
+		t.v2 = m->mFaces[i].mIndices[1];
+		t.v3 = m->mFaces[i].mIndices[2];
 		mh.triangles.push_back(t);
 	}
 }

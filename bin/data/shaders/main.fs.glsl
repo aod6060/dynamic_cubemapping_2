@@ -21,6 +21,8 @@ uniform sampler2D albedo;
 uniform sampler2D normalMap;
 uniform sampler2D specularMap;
 
+uniform sampler2D shadowDepthMap;
+
 // Layout
 in vec2 v_TexCoords;
 //in vec3 v_Normals;
@@ -28,8 +30,42 @@ in vec3 v_mpos;
 in vec3 v_LightDir;
 in vec3 v_ViewDir;
 in mat3 v_TBN;
+in vec3 v_norm;
+in vec4 v_FragPosLightSpace;
 
 out vec4 out_Color;
+
+float ShadowCalc(vec4 p) {
+    vec3 projCoords = p.xyz / p.w;
+
+    projCoords = projCoords * 0.5 + 0.5;
+
+    float closestDepth = texture(shadowDepthMap, projCoords.xy).r;
+
+    float currentDepth = projCoords.z;
+
+    float bias = 0.005;
+
+    //float shadow = (currentDepth - bias> closestDepth) ? 1.0 : 0.0;
+
+    float shadow = 0.0;
+    vec2 texSize = 1.0 / textureSize(shadowDepthMap, 0);
+
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(shadowDepthMap, projCoords.xy + vec2(x, y) * texSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+
+    shadow /= 9.0;
+
+    if(projCoords.z > 1.0) {
+        shadow = 0.0;
+    }
+
+    return shadow;
+}
 
 void main() {
 
@@ -40,9 +76,11 @@ void main() {
     n = n * 2.0 - 1.0;
     n = normalize(v_TBN * n);
 
+    //n = normalize(v_norm);
+
     vec3 l = normalize(v_LightDir);
     vec3 v = normalize(v_ViewDir);
-    vec3 h = normalize(l + v);
+    vec3 h = normalize(v + l);
 
     float ndotl = max(dot(n, l), 0.0);
 
@@ -57,7 +95,10 @@ void main() {
 
     vec3 s = specular * p;
 
-    vec3 finalColor = (a + d * (1.0 - s)) * color + s;
+    //vec3 finalColor = (a + d * (1.0 - s)) * color + s;
+    float shadow = ShadowCalc(v_FragPosLightSpace);
+
+    vec3 finalColor = (a + (1.0 - shadow) * (d)) * color + s * (1.0 - shadow);
 
     //out_Color = vec4(n, 1.0)
     out_Color = vec4(finalColor, 1.0);

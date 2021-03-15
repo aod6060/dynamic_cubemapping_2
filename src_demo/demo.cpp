@@ -3,6 +3,7 @@
 struct Matrices {
 	glm::mat4 proj;
 	glm::mat4 view;
+	glm::mat4 lightSpaceMatrix;
 };
 
 struct Light {
@@ -23,6 +24,12 @@ struct Material {
 
 struct MainProgram : public rend::Program {
 
+	void init() {
+		//this->init("data/shaders/main.vs.glsl", "data/shaders/main.fs.glsl");
+		rend::Program::init(
+			"data/shaders/main.vs.glsl", 
+			"data/shaders/main.fs.glsl");
+	}
 
 	virtual void onCreateUniformsAttributes() {
 		// Uniforms
@@ -38,6 +45,9 @@ struct MainProgram : public rend::Program {
 
 		this->createUniform("specularMap");
 		this->uniform1("specularMap", 2);
+
+		this->createUniform("shadowDepthMap");
+		this->uniform1("shadowDepthMap", 3);
 
 		// Uniforms Buffer Object
 		this->createUniformBlock("Matrices", 0);
@@ -62,11 +72,89 @@ struct MainProgram : public rend::Program {
 
 };
 
+struct SkyboxProgram : public rend::Program {
+	
+	void init() {
+		rend::Program::init(
+			"data/shaders/skybox.vs.glsl",
+			"data/shaders/skybox.fs.glsl"
+		);
+	}
+
+	virtual void onCreateUniformsAttributes() {
+		// Uniforms
+		this->createUniform("skybox");
+		this->uniform1("skybox", 0);
+
+		// Uniforms Buffer Object
+		this->createUniformBlock("Matrices", 0);
+
+		// Attribute
+		this->createAttributes("vertices", 0);
+
+		this->bindAttributes();
+		this->enable("vertices");
+		this->unbindAttribute();
+	}
+};
+
+struct ShadowProgram : public rend::Program {
+
+	void init() {
+		rend::Program::init(
+			"data/shaders/shadow.vs.glsl",
+			"data/shaders/shadow.fs.glsl"
+		);
+	}
+
+	virtual void onCreateUniformsAttributes() {
+		// Uniforms
+		this->createUniform("proj");
+		this->createUniform("view");
+		this->createUniform("model");
+		// Attribute
+		this->createAttributes("vertices", 0);
+
+		this->bindAttributes();
+		this->enable("vertices");
+		this->unbindAttribute();
+	}
+};
+
+struct HUBProgram : public rend::Program {
+	void init() {
+		rend::Program::init(
+			"data/shaders/hub.vs.glsl",
+			"data/shaders/hub.fs.glsl"
+		);
+	}
+
+	virtual void onCreateUniformsAttributes() {
+		// Uniform
+		this->createUniform("proj");
+		this->createUniform("view");
+		this->createUniform("model");
+		this->createUniform("tex0");
+		this->uniform1("tex0", 0);
+		// Attributes
+		this->createAttributes("vertices", 0);
+		this->createAttributes("texCoords", 1);
+
+		this->bindAttributes();
+		this->enable("vertices");
+		this->enable("texCoords");
+		this->unbindAttribute();
+	}
+};
+
 static Matrices matrices;
 static Light light;
 static Material material;
 
 static MainProgram mainProg;
+static SkyboxProgram skyboxProg;
+static ShadowProgram shadowProg;
+static HUBProgram hubProgram;
 
 static rend::UniformBuffer matricesBuffer;
 static rend::UniformBuffer lightBuffer;
@@ -78,15 +166,6 @@ static mesh::OpenGLMesh cylenderMesh;
 static mesh::OpenGLMesh monkeyFaceMesh;
 static mesh::OpenGLMesh sphereMesh;
 static mesh::OpenGLMesh torusMesh;
-
-/*
-static rend::Texture2D grassTex2D;
-static rend::Texture2D dirtTex2D;
-static rend::Texture2D beachSandTex2D;
-static rend::Texture2D seaFloorTex2D;
-static rend::Texture2D brickTex2D;
-static rend::Texture2D waterTex2D;
-*/
 
 struct TextureMaterial {
 	rend::Texture2D albedo;
@@ -151,14 +230,33 @@ static TextureMaterial waterTM;
 
 static transform::Camera camera;
 
+static rend::Cubemap skyboxTex;
+
 static float yrot = 0.0f;
 
+const uint32_t SHADOW_SIZE = 1024 / 2;
 
+rend::Texture2D depthMapTex;
+rend::Framebuffer depthMapFBO;
+
+// HUB Buffers
+rend::VertexBuffer hubVertices;
+rend::VertexBuffer hubTexCoords;
+
+bool isDepthShown = false;
 
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
 	TextureMaterial& tex, 
 	const glm::mat4& model);
+
+void drawShadowMesh(
+	mesh::OpenGLMesh& mesh,
+	const glm::mat4& model);
+
+void drawSkybox(
+	mesh::OpenGLMesh& mesh,
+	rend::Cubemap& cubemap);
 
 void demo_init(ft::Table* table) {
 	ftw::init(table);
@@ -170,11 +268,16 @@ void demo_init(ft::Table* table) {
 	ftw::get()->input.createInputMapping("strafe-right", ftw::get()->input.createInputMapKey(input::Keys::KEY_D));
 	ftw::get()->input.createInputMapping("move-up", ftw::get()->input.createInputMapKey(input::Keys::KEY_SPACE));
 	ftw::get()->input.createInputMapping("move-down", ftw::get()->input.createInputMapKey(input::Keys::KEY_LSHIFT));
+	ftw::get()->input.createInputMapping("toggle-depth", ftw::get()->input.createInputMapKey(input::Keys::KEY_1));
 
 
 	glEnable(GL_DEPTH_TEST);
 
-	mainProg.init("data/shaders/main.vs.glsl", "data/shaders/main.fs.glsl");
+	
+	mainProg.init();
+	skyboxProg.init();
+	shadowProg.init();
+	hubProgram.init();
 
 	// Uniform Buffer
 	matricesBuffer.init();
@@ -235,50 +338,6 @@ void demo_init(ft::Table* table) {
 		"data/textures/water_normal.png",
 		"data/textures/water_specular.png"
 	);
-
-	/*
-	rend::createTexture2D(
-		grassTex2D,
-		"data/textures/grass.png",
-		GL_LINEAR_MIPMAP_LINEAR,
-		GL_LINEAR,
-		true);
-
-	rend::createTexture2D(
-		dirtTex2D,
-		"data/textures/dirt.png",
-		GL_LINEAR_MIPMAP_LINEAR,
-		GL_LINEAR,
-		true);
-
-	rend::createTexture2D(
-		beachSandTex2D,
-		"data/textures/beach_sand.png",
-		GL_LINEAR_MIPMAP_LINEAR,
-		GL_LINEAR,
-		true);
-
-	rend::createTexture2D(
-		seaFloorTex2D,
-		"data/textures/sea_floor.png",
-		GL_LINEAR_MIPMAP_LINEAR,
-		GL_LINEAR,
-		true);
-
-	rend::createTexture2D(
-		brickTex2D,
-		"data/textures/brick.png",
-		GL_LINEAR_MIPMAP_LINEAR,
-		GL_LINEAR,
-		true);
-
-	rend::createTexture2D(
-		waterTex2D,
-		"data/textures/water.png",
-		GL_LINEAR_MIPMAP_LINEAR,
-		GL_LINEAR,
-		true);
-	*/
 	camera.init(
 		glm::vec3(0.0f, 2.0f, 0.0f),
 		glm::vec2(0.0f, 0.0f),
@@ -287,13 +346,73 @@ void demo_init(ft::Table* table) {
 		1.0f,
 		1024.0f);
 
+	rend::createCubemap(
+		skyboxTex,
+		"data/textures/skybox/east.png",
+		"data/textures/skybox/west.png",
+		"data/textures/skybox/up.png",
+		"data/textures/skybox/down.png",
+		"data/textures/skybox/north.png",
+		"data/textures/skybox/south.png");
 
+	//frameBuffer.init();
+
+
+	depthMapTex.init();
+	depthMapTex.bind(GL_TEXTURE0);
+
+	depthMapTex.update(SHADOW_SIZE, SHADOW_SIZE, GL_DEPTH_COMPONENT, GL_FLOAT);
+
+	depthMapTex.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	depthMapTex.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	depthMapTex.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	depthMapTex.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+	glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+	depthMapTex.unbind(GL_TEXTURE0);
+
+	depthMapFBO.init();
+	depthMapFBO.bind();
+
+	depthMapFBO.attachDepthBuffer(depthMapTex);
+
+	depthMapFBO.drawBuffers(GL_NONE);
+	depthMapFBO.readBuffer(GL_NONE);
+	depthMapFBO.unbind();
+
+
+	hubVertices.init();
+	hubVertices.add3(0.0f, 0.0f, 0.0f);
+	hubVertices.add3(1.0f, 0.0f, 0.0f);
+	hubVertices.add3(0.0f, 1.0f, 0.0f);
+
+	hubVertices.add3(0.0f, 1.0f, 0.0f);
+	hubVertices.add3(1.0f, 0.0f, 0.0f);
+	hubVertices.add3(1.0f, 1.0f, 0.0f);
+	hubVertices.update();
+
+	hubTexCoords.init();
+	hubTexCoords.add2(0.0f, 1.0f);
+	hubTexCoords.add2(1.0f, 1.0f);
+	hubTexCoords.add2(0.0f, 0.0f);
+
+	hubTexCoords.add2(0.0f, 0.0f);
+	hubTexCoords.add2(1.0f, 1.0f);
+	hubTexCoords.add2(1.0f, 0.0f);
+
+	hubTexCoords.update();
 }
 
 void demo_update(float delta) {
 
 	if (ftw::get()->input.isInputMapPressOnce("toggle-grab")) {
 		ftw::get()->input.toggleGrab();
+	}
+
+	if (ftw::get()->input.isInputMapPressOnce("toggle-depth")) {
+		isDepthShown = !isDepthShown;
 	}
 
 	camera.update(delta);
@@ -305,16 +424,121 @@ void demo_update(float delta) {
 	}
 }
 
+void demo_render_scene() {
+	skyboxProg.bind();
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LEQUAL);
+
+	// Draw skybox
+	drawSkybox(cubeMesh, skyboxTex);
+
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+
+	skyboxProg.unbind();
+
+	mainProg.bind();
+
+	mainProg.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
+
+	depthMapTex.bind(GL_TEXTURE3);
+	drawMesh(floorMesh, grassTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
+	drawMesh(cubeMesh, brickTM, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(cylenderMesh, beachSandTM, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(monkeyFaceMesh, seaFloorTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(sphereMesh, dirtTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(torusMesh, waterTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	depthMapTex.unbind(GL_TEXTURE3);
+
+	mainProg.unbind();
+}
+
+void demo_render_shadow() {
+
+	float size = 10.0f;
+	float near_plane = 1.0f;
+	float far_plane = 32.0f;
+
+	glEnable(GL_CULL_FACE);
+
+	glCullFace(GL_FRONT);
+	//glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
+	depthMapFBO.bind();
+	glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
+	glClear(GL_DEPTH_BUFFER_BIT);
+
+	glm::mat4 proj = glm::ortho(-size, size, -size, size, near_plane, far_plane);
+	//glm::mat4 proj = camera.toProj();
+	glm::mat4 view = glm::lookAt(-light.direction * size, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	//glm::mat4 view = camera.toView();
+
+	matrices.lightSpaceMatrix = proj * view;
+
+	shadowProg.bind();
+
+	shadowProg.uniformMat4("proj", proj);
+	shadowProg.uniformMat4("view", view);
+
+	drawShadowMesh(floorMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
+	drawShadowMesh(cubeMesh, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(cylenderMesh, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(monkeyFaceMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(sphereMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(torusMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+
+	shadowProg.unbind();
+	
+	depthMapFBO.unbind();
+	glCullFace(GL_BACK);
+
+	glDisable(GL_CULL_FACE);
+}
+
+void render_hub() {
+
+	glDisable(GL_DEPTH_TEST);
+
+	glm::mat4 proj = glm::ortho(0.0f, (float)ftw::get()->app.getWidth(), (float)ftw::get()->app.getHeight(), 0.0f);
+	glm::mat4 view = glm::mat4(1.0f);
+
+	glm::mat4 model =
+		glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
+		glm::scale(glm::mat4(1.0f), glm::vec3(256.0f, 256.0f, 0.0f));
+
+
+
+	hubProgram.bind();
+	
+	hubProgram.uniformMat4("proj", proj);
+	hubProgram.uniformMat4("view", view);
+
+	if (isDepthShown) {
+		hubProgram.uniformMat4("model", model);
+
+		depthMapTex.bind(GL_TEXTURE0);
+		hubProgram.bindAttributes();
+
+		hubVertices.bind();
+		hubProgram.ptr("vertices", 3, GL_FLOAT);
+		hubTexCoords.bind();
+		hubProgram.ptr("texCoords", 2, GL_FLOAT);
+		hubTexCoords.unbind();
+
+		glDrawArrays(GL_TRIANGLES, 0, hubVertices.count());
+
+		hubProgram.unbindAttribute();
+		depthMapTex.unbind(GL_TEXTURE0);
+	}
+
+	hubProgram.unbind();
+
+	glEnable(GL_DEPTH_TEST);
+}
+
 void demo_render() {
 
-	matrices.proj = camera.toProj();
-	matrices.view = camera.toView();
-
-	matricesBuffer.update(&matrices, sizeof(matrices));
-
-
 	// Setup Light
-	light.direction = glm::vec3(0.0f, -0.5, 1.0f);
+	light.direction = glm::vec3(1.0f, -1.0f, -1.0f);
 	light.ambient = glm::vec3(0.1f);
 	light.diffuse = glm::vec3(0.8f);
 	light.specular = glm::vec3(1.0f);
@@ -322,25 +546,38 @@ void demo_render() {
 
 	lightBuffer.update(&light, sizeof(light));
 
+	demo_render_shadow();
+
+
+	matrices.proj = camera.toProj();
+	matrices.view = camera.toView();
+
+	matricesBuffer.update(&matrices, sizeof(matrices));
+
+	// Handle Framebuffers
 	glViewport(0, 0, ftw::get()->app.getWidth(), ftw::get()->app.getHeight());
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-	mainProg.bind();
+	demo_render_scene();
 
-	mainProg.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
-
-	drawMesh(floorMesh, grassTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
-	drawMesh(cubeMesh, brickTM, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(cylenderMesh, beachSandTM, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(monkeyFaceMesh, seaFloorTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(sphereMesh, dirtTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(torusMesh, waterTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-
-	mainProg.unbind();
+	render_hub();
 }
 
 void demo_release() {
+	hubTexCoords.release();
+	hubVertices.release();
+
+	//hubProgram.release();
+
+	// Framebuffer
+	//frameBuffer.release();
+
+	depthMapTex.release();
+	depthMapTex.release();
+
+	// Skybox
+	skyboxTex.release();
 	// Texture2D
 	grassTM.release();
 	dirtTM.release();
@@ -361,6 +598,9 @@ void demo_release() {
 	lightBuffer.release();
 	matricesBuffer.release();
 	
+	hubProgram.release();
+	shadowProg.release();
+	skyboxProg.release();
 	mainProg.release();
 
 	ftw::get()->input.clearInputMaps();
@@ -402,3 +642,39 @@ void drawMesh(
 	tex.unbind();
 }
 
+void drawShadowMesh(mesh::OpenGLMesh& mesh, const glm::mat4& model) {
+	shadowProg.uniformMat4("model", model);
+	
+	shadowProg.bindAttributes();
+
+	mesh.vertices.bind();
+	shadowProg.ptr("vertices", 3, GL_FLOAT);
+	mesh.vertices.unbind();
+
+	mesh.index.bind();
+	glDrawElements(GL_TRIANGLES, mesh.index.count(), GL_UNSIGNED_INT, nullptr);
+	mesh.index.unbind();
+
+	shadowProg.unbindAttribute();
+}
+
+void drawSkybox(
+	mesh::OpenGLMesh& mesh,
+	rend::Cubemap& cubemap) {
+
+	cubemap.bind(GL_TEXTURE0);
+
+	skyboxProg.bindAttributes();
+
+	mesh.vertices.bind();
+	skyboxProg.ptr("vertices", 3, GL_FLOAT);
+	mesh.vertices.unbind();
+
+	mesh.index.bind();
+	glDrawElements(GL_TRIANGLES, mesh.index.count(), GL_UNSIGNED_INT, nullptr);
+	mesh.index.unbind();
+
+	skyboxProg.unbindAttribute();
+
+	cubemap.unbind(GL_TEXTURE0);
+}

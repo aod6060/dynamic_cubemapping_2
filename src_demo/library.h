@@ -171,6 +171,7 @@ namespace rend {
 
 		void update(image::Image& image);
 		void update(uint32_t width, uint32_t height, uint32_t bbp);
+		void update(uint32_t width, uint32_t height, GLenum format, GLenum type);
 	};
 
 
@@ -180,6 +181,71 @@ namespace rend {
 		uint32_t minFilter,
 		uint32_t magFilter,
 		bool generateMipmaps);
+
+	struct Cubemap {
+		uint32_t id = 0;
+
+		void init();
+		void release();
+
+		void bind(GLenum unit);
+		void unbind(GLenum uint);
+
+		void parameteri(GLenum type, int32_t value);
+
+		// east
+		void updateEast(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
+		void updateEast(image::Image& image);
+
+		// west
+		void updateWest(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
+		void updateWest(image::Image& image);
+
+		// up
+		void updateUp(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
+		void updateUp(image::Image& image);
+
+		// down
+		void updateDown(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
+		void updateDown(image::Image& image);
+
+		// north
+		void updateNorth(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
+		void updateNorth(image::Image& image);
+
+		// south
+		void updateSouth(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
+		void updateSouth(image::Image& image);
+
+	};
+
+	void createCubemap(
+		Cubemap& cubemap,
+		std::string east,
+		std::string west,
+		std::string up,
+		std::string down,
+		std::string north,
+		std::string south);
+
+	void createEmptyCubemap(Cubemap& cubemap, uint32_t width, uint32_t height);
+
+	struct Framebuffer {
+		uint32_t id = 0;
+
+		void init();
+		void release();
+
+		void bind();
+		void unbind();
+
+		void attachDepthBuffer(Texture2D& tex);
+
+		void drawBuffers(GLenum d);
+
+		void readBuffer(GLenum d);
+	};
+
 
 }
 

@@ -415,6 +415,18 @@ namespace rend {
 			nullptr);
 	}
 
+	void Texture2D::update(uint32_t width, uint32_t height, GLenum format, GLenum type) {
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			format,
+			width,
+			height,
+			0,
+			format,
+			type,
+			nullptr);
+	}
 
 	void createTexture2D(
 		Texture2D& out,
@@ -443,5 +455,244 @@ namespace rend {
 		out.unbind(GL_TEXTURE0);
 		t.release();
 	}
+
+
+
+	// Cubemap
+	void Cubemap::init() {
+		glGenTextures(1, &this->id);
+	}
+	
+	void Cubemap::release() {
+		glDeleteTextures(1, &this->id);
+	}
+
+	void Cubemap::bind(GLenum unit) {
+		glActiveTexture(unit);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, this->id);
+	}
+	
+	void Cubemap::unbind(GLenum unit) {
+		glActiveTexture(unit);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	}
+
+	void Cubemap::parameteri(GLenum type, int32_t value) {
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, type, value);
+	}
+
+	uint32_t getCubemap(uint32_t v) {
+		return GL_TEXTURE_CUBE_MAP_POSITIVE_X + v;
+	}
+
+	// east
+	void Cubemap::updateEast(uint32_t width, uint32_t height, uint32_t bpp, void* pixel) {
+		glTexImage2D(
+			getCubemap(0),
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			width,
+			height,
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			GL_UNSIGNED_BYTE,
+			pixel);
+	}
+	
+	void Cubemap::updateEast(image::Image& image) {
+		this->updateEast(image.width, image.height, image.bbp, image.pixels.data());
+	}
+
+	// west
+	void Cubemap::updateWest(uint32_t width, uint32_t height, uint32_t bpp, void* pixel) {
+		glTexImage2D(
+			getCubemap(1),
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			width,
+			height,
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			GL_UNSIGNED_BYTE,
+			pixel);
+	}
+	
+	void Cubemap::updateWest(image::Image& image) {
+		this->updateWest(image.width, image.height, image.bbp, image.pixels.data());
+	}
+
+	// up
+	void Cubemap::updateUp(uint32_t width, uint32_t height, uint32_t bpp, void* pixel) {
+		glTexImage2D(
+			getCubemap(2),
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			width,
+			height,
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			GL_UNSIGNED_BYTE,
+			pixel);
+	}
+	
+	void Cubemap::updateUp(image::Image& image) {
+		this->updateUp(image.width, image.height, image.bbp, image.pixels.data());
+	}
+
+	// down
+	void Cubemap::updateDown(uint32_t width, uint32_t height, uint32_t bpp, void* pixel) {
+		glTexImage2D(
+			getCubemap(3),
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			width,
+			height,
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			GL_UNSIGNED_BYTE,
+			pixel);
+	}
+	
+	void Cubemap::updateDown(image::Image& image) {
+		this->updateDown(image.width, image.height, image.bbp, image.pixels.data());
+	}
+
+	// north
+	void Cubemap::updateNorth(uint32_t width, uint32_t height, uint32_t bpp, void* pixel) {
+		glTexImage2D(
+			getCubemap(4),
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			width,
+			height,
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			GL_UNSIGNED_BYTE,
+			pixel);
+	}
+	
+	void Cubemap::updateNorth(image::Image& image) {
+		this->updateNorth(image.width, image.height, image.bbp, image.pixels.data());
+	}
+
+	// south
+	void Cubemap::updateSouth(uint32_t width, uint32_t height, uint32_t bpp, void* pixel) {
+		glTexImage2D(
+			getCubemap(5),
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			width,
+			height,
+			0,
+			(bpp == 4) ? GL_RGBA : GL_RGB,
+			GL_UNSIGNED_BYTE,
+			pixel);
+	}
+	
+	void Cubemap::updateSouth(image::Image& image) {
+		this->updateSouth(image.width, image.height, image.bbp, image.pixels.data());
+	}
+
+	void createCubemap(
+		Cubemap& cubemap,
+		std::string east,
+		std::string west,
+		std::string up,
+		std::string down,
+		std::string north,
+		std::string south) {
+
+		image::Image e, w, u, d, n, s;
+
+		e.init(east);
+		w.init(west);
+		u.init(up);
+		d.init(down);
+		n.init(north);
+		s.init(south);
+
+
+		cubemap.init();
+
+		cubemap.bind(GL_TEXTURE0);
+
+		cubemap.updateEast(e);
+		cubemap.updateWest(w);
+		cubemap.updateUp(u);
+		cubemap.updateDown(d);
+		cubemap.updateNorth(n);
+		cubemap.updateSouth(s);
+
+		cubemap.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		cubemap.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		cubemap.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		cubemap.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		cubemap.parameteri(GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+		cubemap.unbind(GL_TEXTURE0);
+
+		e.release();
+		w.release();
+		u.release();
+		d.release();
+		n.release();
+		s.release();
+	}
+
+	void createEmptyCubemap(
+		Cubemap& cubemap, 
+		uint32_t width, 
+		uint32_t height) {
+
+		cubemap.init();
+
+		cubemap.bind(GL_TEXTURE0);
+
+		cubemap.updateEast(width, height, 3, nullptr);
+		cubemap.updateWest(width, height, 3, nullptr);
+		cubemap.updateUp(width, height, 3, nullptr);
+		cubemap.updateDown(width, height, 3, nullptr);
+		cubemap.updateNorth(width, height, 3, nullptr);
+		cubemap.updateSouth(width, height, 3, nullptr);
+
+		cubemap.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		cubemap.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		cubemap.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		cubemap.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		cubemap.parameteri(GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+		cubemap.unbind(GL_TEXTURE0);
+
+	}
+
+	// Framebuffer
+	void Framebuffer::init() {
+		glGenFramebuffers(1, &this->id);
+	}
+
+	void Framebuffer::release() {
+		glDeleteFramebuffers(1, &this->id);
+	}
+
+	void Framebuffer::bind() {
+		glBindFramebuffer(GL_FRAMEBUFFER, this->id);
+	}
+
+	void Framebuffer::unbind() {
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	void Framebuffer::attachDepthBuffer(Texture2D& tex) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.id, 0);
+	}
+
+	void Framebuffer::drawBuffers(GLenum d) {
+		glDrawBuffer(d);
+	}
+
+	void Framebuffer::readBuffer(GLenum d) {
+		glReadBuffer(d);
+	}
+
 }
 
