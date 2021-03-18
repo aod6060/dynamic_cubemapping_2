@@ -459,6 +459,8 @@ namespace rend {
 
 
 	// Cubemap
+	uint32_t Cubemap::SIZE = 6;
+
 	void Cubemap::init() {
 		glGenTextures(1, &this->id);
 	}
@@ -486,6 +488,26 @@ namespace rend {
 	}
 
 	// east
+	void Cubemap::update(
+		uint32_t index, 
+		GLenum format, 
+		GLenum type, 
+		uint32_t width, 
+		uint32_t height) {
+
+		glTexImage2D(
+			GL_TEXTURE_CUBE_MAP_POSITIVE_X + index,
+			0,
+			format,
+			width,
+			height,
+			0,
+			format,
+			GL_UNSIGNED_BYTE,
+			0);
+
+	}
+
 	void Cubemap::updateEast(uint32_t width, uint32_t height, uint32_t bpp, void* pixel) {
 		glTexImage2D(
 			getCubemap(0),
@@ -665,6 +687,29 @@ namespace rend {
 
 	}
 
+
+
+	// Renderbuffer
+	void Renderbuffer::init() {
+		glGenRenderbuffers(1, &this->id);
+	}
+	
+	void Renderbuffer::release() {
+		glDeleteRenderbuffers(1, &this->id);
+	}
+
+	void Renderbuffer::bind() {
+		glBindRenderbuffer(GL_RENDERBUFFER, id);
+	}
+
+	void Renderbuffer::unbind() {
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+	}
+
+	void Renderbuffer::update(GLenum format, uint32_t width, uint32_t height) {
+		glRenderbufferStorage(GL_RENDERBUFFER, format, width, height);
+	}
+
 	// Framebuffer
 	void Framebuffer::init() {
 		glGenFramebuffers(1, &this->id);
@@ -685,6 +730,20 @@ namespace rend {
 	void Framebuffer::attachDepthBuffer(Texture2D& tex) {
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, tex.id, 0);
 	}
+
+	void Framebuffer::attachDepthBuffer(Renderbuffer& rend) {
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rend.id);
+	}
+
+	// color buffer
+	void Framebuffer::attachColorBuffer(GLenum colorAttachment, Texture2D& tex) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, colorAttachment, GL_TEXTURE_2D, tex.id, 0);
+	}
+	
+	void Framebuffer::attachColorBuffer(GLenum colorAttachment, GLenum target, Cubemap& cubemap) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, colorAttachment, target, cubemap.id, 0);
+	}
+
 
 	void Framebuffer::drawBuffers(GLenum d) {
 		glDrawBuffer(d);

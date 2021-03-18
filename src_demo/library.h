@@ -183,6 +183,8 @@ namespace rend {
 		bool generateMipmaps);
 
 	struct Cubemap {
+		static uint32_t SIZE;
+
 		uint32_t id = 0;
 
 		void init();
@@ -192,6 +194,13 @@ namespace rend {
 		void unbind(GLenum uint);
 
 		void parameteri(GLenum type, int32_t value);
+
+		void update(
+			uint32_t index, 
+			GLenum format, 
+			GLenum type, 
+			uint32_t width, 
+			uint32_t height);
 
 		// east
 		void updateEast(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
@@ -216,7 +225,6 @@ namespace rend {
 		// south
 		void updateSouth(uint32_t width, uint32_t height, uint32_t bpp, void* pixel);
 		void updateSouth(image::Image& image);
-
 	};
 
 	void createCubemap(
@@ -230,6 +238,19 @@ namespace rend {
 
 	void createEmptyCubemap(Cubemap& cubemap, uint32_t width, uint32_t height);
 
+
+	struct Renderbuffer {
+		uint32_t id = 0;
+
+		void init();
+		void release();
+
+		void bind();
+		void unbind();
+
+		void update(GLenum type, uint32_t width, uint32_t height);
+	};
+
 	struct Framebuffer {
 		uint32_t id = 0;
 
@@ -240,6 +261,11 @@ namespace rend {
 		void unbind();
 
 		void attachDepthBuffer(Texture2D& tex);
+		void attachDepthBuffer(Renderbuffer& rend);
+
+		// color buffer attachment
+		void attachColorBuffer(GLenum colorAttachment, Texture2D& tex);
+		void attachColorBuffer(GLenum colorAttachment, GLenum target, Cubemap& cubemap);
 
 		void drawBuffers(GLenum d);
 

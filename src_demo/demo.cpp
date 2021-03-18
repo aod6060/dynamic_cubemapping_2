@@ -1,5 +1,20 @@
 #include "library.h"
 
+// Enviorment Mapping
+#define ENV_REFLECT 0
+#define ENV_REFRACT 1
+#define ENV_GLASS 2
+#define ENV_SIZE 3
+
+// Effects
+#define FX_REGULAR 0
+#define FX_BK 1
+#define FX_SEPAI 2
+#define FX_INVERT 3
+#define FX_BLUR 4
+#define FX_PIXELATED 5
+#define FX_SIZE 6
+
 struct Matrices {
 	glm::mat4 proj;
 	glm::mat4 view;
@@ -167,6 +182,13 @@ struct ReflectiveProgram : public rend::Program {
 		this->createUniform("refTex");
 		this->uniform1("refTex", 0);
 
+		this->createUniform("normalMap");
+		this->uniform1("normalMap", 1);
+
+		this->createUniform("isNormalMapped");
+		this->createUniform("envType");
+		this->createUniform("fxType");
+
 		// Uniform Buffer Object
 		this->createUniformBlock("Matrices", 0);
 		this->createUniformBlock("Light", 1);
@@ -174,12 +196,17 @@ struct ReflectiveProgram : public rend::Program {
 
 		// Attribute
 		this->createAttributes("vertices", 0);
-		this->createAttributes("normals", 1);
+		this->createAttributes("texCoords", 1);
+		this->createAttributes("normals", 2);
+		this->createAttributes("tangents", 3);
+		this->createAttributes("biTangents", 4);
 
 		this->bindAttributes();
 		this->enable("vertices");
 		this->enable("texCoords");
 		this->enable("normals");
+		this->enable("tangents");
+		this->enable("biTangents");
 		this->unbindAttribute();
 	}
 };
@@ -203,6 +230,7 @@ static mesh::OpenGLMesh cubeMesh;
 static mesh::OpenGLMesh cylenderMesh;
 static mesh::OpenGLMesh monkeyFaceMesh;
 static mesh::OpenGLMesh sphereMesh;
+static mesh::OpenGLMesh sphere2Mesh;
 static mesh::OpenGLMesh torusMesh;
 
 static std::vector<mesh::OpenGLMesh*> meshes;
@@ -286,6 +314,18 @@ rend::VertexBuffer hubTexCoords;
 
 bool isDepthShown = false;
 
+// Dynamic Cubemap
+const uint32_t DYNAMIC_CM_SIZE = 1024;
+
+rend::Cubemap dynamicCubemap;
+rend::Renderbuffer dynamicCubemapDepth;
+rend::Framebuffer dynamicCubemapFB;
+
+
+bool isNormalMapped = false;
+int envType = ENV_REFLECT;
+int fxType = FX_REGULAR;
+
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
 	TextureMaterial& tex, 
@@ -311,6 +351,9 @@ void demo_init(ft::Table* table) {
 	ftw::get()->input.createInputMapping("move-down", ftw::get()->input.createInputMapKey(input::Keys::KEY_LSHIFT));
 	ftw::get()->input.createInputMapping("toggle-depth", ftw::get()->input.createInputMapKey(input::Keys::KEY_1));
 	ftw::get()->input.createInputMapping("next-mesh", ftw::get()->input.createInputMapKey(input::Keys::KEY_2));
+	ftw::get()->input.createInputMapping("toggle-normalMap", ftw::get()->input.createInputMapKey(input::Keys::KEY_3));
+	ftw::get()->input.createInputMapping("next-env-type", ftw::get()->input.createInputMapKey(input::Keys::KEY_4));
+	ftw::get()->input.createInputMapping("next-fx-type", ftw::get()->input.createInputMapKey(input::Keys::KEY_5));
 
 	glEnable(GL_DEPTH_TEST);
 
@@ -342,10 +385,12 @@ void demo_init(ft::Table* table) {
 	cylenderMesh.init("data/meshes/cylender.m");
 	monkeyFaceMesh.init("data/meshes/monkey_face.m");
 	sphereMesh.init("data/meshes/sphere.m");
+	sphere2Mesh.init("data/meshes/sphere2.m");
 	torusMesh.init("data/meshes/torus.m");
 
 	meshes.push_back(&cubeMesh);
 	meshes.push_back(&sphereMesh);
+	meshes.push_back(&sphere2Mesh);
 	meshes.push_back(&cylenderMesh);
 	meshes.push_back(&torusMesh);
 	meshes.push_back(&monkeyFaceMesh);
@@ -451,6 +496,47 @@ void demo_init(ft::Table* table) {
 	hubTexCoords.add2(1.0f, 0.0f);
 
 	hubTexCoords.update();
+
+
+
+	// Initialize Dynamic Mapping
+	// Cubemap
+	dynamicCubemap.init();
+
+	dynamicCubemap.bind(GL_TEXTURE0);
+	for (uint32_t i = 0; i < rend::Cubemap::SIZE; i++) {
+		dynamicCubemap.update(i, GL_RGB, GL_UNSIGNED_BYTE, DYNAMIC_CM_SIZE, DYNAMIC_CM_SIZE);
+	}
+
+	dynamicCubemap.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	dynamicCubemap.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+	dynamicCubemap.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	dynamicCubemap.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	dynamicCubemap.parameteri(GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+
+	dynamicCubemap.unbind(GL_TEXTURE0);
+
+	// Renderbuffer
+	dynamicCubemapDepth.init();
+
+	dynamicCubemapDepth.bind();
+	dynamicCubemapDepth.update(GL_DEPTH_COMPONENT, DYNAMIC_CM_SIZE, DYNAMIC_CM_SIZE);
+	dynamicCubemapDepth.unbind();
+
+	// Framebuffer
+	dynamicCubemapFB.init();
+
+	dynamicCubemapFB.bind();
+
+	dynamicCubemapFB.attachDepthBuffer(dynamicCubemapDepth);
+
+	dynamicCubemapFB.attachColorBuffer(GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, dynamicCubemap);
+
+	dynamicCubemapFB.readBuffer(GL_COLOR_ATTACHMENT0);
+	dynamicCubemapFB.drawBuffers(GL_COLOR_ATTACHMENT0);
+
+	dynamicCubemapFB.unbind();
 }
 
 void demo_update(float delta) {
@@ -471,6 +557,26 @@ void demo_update(float delta) {
 			mIndex = 0;
 		}
 	}
+
+	if (ftw::get()->input.isInputMapPressOnce("toggle-normalMap")) {
+		isNormalMapped = !isNormalMapped;
+	}
+
+	if (ftw::get()->input.isInputMapPressOnce("next-env-type")) {
+		envType += 1;
+
+		if (envType >= ENV_SIZE) {
+			envType = 0;
+		}
+	}
+
+	if (ftw::get()->input.isInputMapPressOnce("next-fx-type")) {
+		fxType += 1;
+		if (fxType >= FX_SIZE) {
+			fxType = 0;
+		}
+	}
+
 	camera.update(delta);
 		
 	yrot += 32.0f * delta;
@@ -511,7 +617,12 @@ void demo_render_scene() {
 
 	reflectiveProgram.bind();
 
-	skyboxTex.bind(GL_TEXTURE0);
+	reflectiveProgram.uniform1("isNormalMapped", isNormalMapped);
+	reflectiveProgram.uniform1("envType", envType);
+	reflectiveProgram.uniform1("fxType", fxType);
+
+	dynamicCubemap.bind(GL_TEXTURE0);
+	dirtTM.normal.bind(GL_TEXTURE1);
 
 	glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f));
 
@@ -526,8 +637,14 @@ void demo_render_scene() {
 
 	meshes[mIndex]->vertices.bind();
 	reflectiveProgram.ptr("vertices", 3, GL_FLOAT);
+	meshes[mIndex]->texCoords.bind();
+	reflectiveProgram.ptr("texCoords", 2, GL_FLOAT);
 	meshes[mIndex]->normals.bind();
 	reflectiveProgram.ptr("normals", 3, GL_FLOAT);
+	meshes[mIndex]->tangents.bind();
+	reflectiveProgram.ptr("tangents", 3, GL_FLOAT);
+	meshes[mIndex]->biTangents.bind();
+	reflectiveProgram.ptr("biTangents", 3, GL_FLOAT);
 	meshes[mIndex]->vertices.unbind();
 
 	meshes[mIndex]->index.bind();
@@ -538,7 +655,8 @@ void demo_render_scene() {
 
 	reflectiveProgram.unbind();
 
-	skyboxTex.unbind(GL_TEXTURE0);
+	dirtTM.normal.bind(GL_TEXTURE1);
+	dynamicCubemap.unbind(GL_TEXTURE0);
 	depthMapTex.unbind(GL_TEXTURE3);
 }
 
@@ -583,6 +701,148 @@ void demo_render_shadow() {
 	glCullFace(GL_BACK);
 
 	glDisable(GL_CULL_FACE);
+}
+
+void demo_render_cubemap() {
+	/*
+	skyboxProg.bind();
+	glDepthMask(GL_FALSE);
+	glDepthFunc(GL_LEQUAL);
+
+	// Draw skybox
+	drawSkybox(cubeMesh, skyboxTex);
+
+	glDepthFunc(GL_LESS);
+	glDepthMask(GL_TRUE);
+
+	skyboxProg.unbind();
+
+	depthMapTex.bind(GL_TEXTURE3);
+	mainProg.bind();
+
+	mainProg.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
+
+
+	drawMesh(floorMesh, grassTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
+	drawMesh(cubeMesh, brickTM, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(cylenderMesh, beachSandTM, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(monkeyFaceMesh, seaFloorTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(sphereMesh, dirtTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawMesh(torusMesh, waterTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+
+
+	mainProg.unbind();
+
+	depthMapTex.unbind(GL_TEXTURE3);
+	*/
+
+	// glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f))
+
+	std::function<void(uint32_t, glm::mat4&, glm::vec3)> toView = [&](uint32_t index, glm::mat4& out, glm::vec3 pos) {
+		glm::mat4 la;
+
+		switch (GL_TEXTURE_CUBE_MAP_POSITIVE_X + index) {
+		case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+			la = glm::lookAt(
+				pos,
+				pos + glm::vec3(1, 0, 0),
+				glm::vec3(0, -1, 0)
+			);
+			break;
+		case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+			la = glm::lookAt(
+				pos,
+				pos + glm::vec3(-1, 0, 0),
+				glm::vec3(0, -1, 0)
+			);
+			break;
+		case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+			la = glm::lookAt(
+				pos,
+				pos + glm::vec3(0, 1, 0),
+				glm::vec3(0, 0, 1)
+			);
+			break;
+		case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+			la = glm::lookAt(
+				pos,
+				pos + glm::vec3(0, -1, 0),
+				glm::vec3(0, 0, -1)
+			);
+			break;
+		case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+			la = glm::lookAt(
+				pos,
+				pos + glm::vec3(0, 0, 1),
+				glm::vec3(0, -1, 0)
+			);
+			break;
+		case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+			la = glm::lookAt(
+				pos,
+				pos + glm::vec3(0, 0, -1),
+				glm::vec3(0, -1, 0)
+			);
+			break;
+		}
+
+		out = la;
+	};
+
+
+	for (uint32_t i = 0; i < rend::Cubemap::SIZE; i++) {
+		dynamicCubemapFB.bind();
+		dynamicCubemapFB.attachColorBuffer(GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, dynamicCubemap);
+
+		Matrices m;
+
+		m.proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 1024.0f);
+		
+		glm::mat4 view;
+		toView(i, view, glm::vec3(0.0f, 2.0f, 0.0f));
+
+		m.view = view;
+		m.lightSpaceMatrix = matrices.lightSpaceMatrix;
+
+		matricesBuffer.update(&m, sizeof(matrices));
+
+		glViewport(0, 0, DYNAMIC_CM_SIZE, DYNAMIC_CM_SIZE);
+		glClearColor(1.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		skyboxProg.bind();
+		glDepthMask(GL_FALSE);
+		glDepthFunc(GL_LEQUAL);
+
+		// Draw skybox
+		drawSkybox(cubeMesh, skyboxTex);
+
+		glDepthFunc(GL_LESS);
+		glDepthMask(GL_TRUE);
+
+		skyboxProg.unbind();
+
+		depthMapTex.bind(GL_TEXTURE3);
+		mainProg.bind();
+
+		mainProg.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
+
+
+		drawMesh(floorMesh, grassTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
+		drawMesh(cubeMesh, brickTM, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		drawMesh(cylenderMesh, beachSandTM, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		drawMesh(monkeyFaceMesh, seaFloorTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		drawMesh(sphereMesh, dirtTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		drawMesh(torusMesh, waterTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+
+
+		mainProg.unbind();
+
+		depthMapTex.unbind(GL_TEXTURE3);
+
+		dynamicCubemapFB.unbind();
+	}
+
 }
 
 void render_hub() {
@@ -640,10 +900,13 @@ void demo_render() {
 	demo_render_shadow();
 
 
+	demo_render_cubemap();
+
 	matrices.proj = camera.toProj();
 	matrices.view = camera.toView();
 
 	matricesBuffer.update(&matrices, sizeof(matrices));
+
 
 	// Handle Framebuffers
 	glViewport(0, 0, ftw::get()->app.getWidth(), ftw::get()->app.getHeight());
@@ -656,6 +919,11 @@ void demo_render() {
 }
 
 void demo_release() {
+
+	dynamicCubemapFB.release();
+	dynamicCubemapDepth.release();
+	dynamicCubemap.release();
+
 	hubTexCoords.release();
 	hubVertices.release();
 
@@ -685,6 +953,7 @@ void demo_release() {
 	cylenderMesh.release();
 	monkeyFaceMesh.release();
 	sphereMesh.release();
+	sphere2Mesh.release();
 	torusMesh.release();
 
 	materialBuffer.release();

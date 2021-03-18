@@ -2,7 +2,10 @@
 
 
 layout(location = 0) in vec3 vertices;
-layout(location = 1) in vec3 normals;
+layout(location = 1) in vec2 texCoords;
+layout(location = 2) in vec3 normals;
+layout(location = 3) in vec3 tangents;
+layout(location = 4) in vec3 biTangents;
 
 // Uniforms
 layout(std140) uniform Matrices {
@@ -31,6 +34,8 @@ out vec3 v_LightDir;
 out vec3 v_ViewDir;
 out vec4 v_FragPosLightSpace;
 out vec3 v_Irradiance;
+out mat3 v_TBN;
+out vec2 v_TexCoords;
 
 void main() {
     gl_Position = proj * view * model * vec4(vertices, 1.0);
@@ -43,4 +48,11 @@ void main() {
     v_FragPosLightSpace = lightSpaceMatrix * vec4(mpos, 1.0);
 
     v_Irradiance = normalize(mpos - cameraPos);
+
+    vec3 T = normalize(mat3(normalMatrix) * tangents);
+    vec3 B = normalize(mat3(normalMatrix) * biTangents);
+
+    v_TBN = mat3(T, B, v_Normal);
+
+    v_TexCoords = texCoords;
 }
