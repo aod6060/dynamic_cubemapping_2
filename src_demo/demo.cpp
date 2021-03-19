@@ -64,6 +64,9 @@ struct MainProgram : public rend::Program {
 		this->createUniform("shadowDepthMap");
 		this->uniform1("shadowDepthMap", 3);
 
+		this->createUniform("transMap");
+		this->uniform1("transMap", 4);
+
 		// Uniforms Buffer Object
 		this->createUniformBlock("Matrices", 0);
 		this->createUniformBlock("Light", 1);
@@ -127,11 +130,17 @@ struct ShadowProgram : public rend::Program {
 		this->createUniform("proj");
 		this->createUniform("view");
 		this->createUniform("model");
+		this->createUniform("normalMatrix");
+		this->createUniform("lightDir");
+		this->createUniform("isTrans");
+
 		// Attribute
 		this->createAttributes("vertices", 0);
+		this->createAttributes("normals", 1);
 
 		this->bindAttributes();
 		this->enable("vertices");
+		this->enable("normals");
 		this->unbindAttribute();
 	}
 };
@@ -178,6 +187,9 @@ struct ReflectiveProgram : public rend::Program {
 
 		this->createUniform("shadowMap");
 		this->uniform1("shadowMap", 3);
+
+		this->createUniform("transMap");
+		this->uniform1("transMap", 4);
 
 		this->createUniform("refTex");
 		this->uniform1("refTex", 0);
@@ -303,9 +315,10 @@ static rend::Cubemap skyboxTex;
 
 static float yrot = 0.0f;
 
-const uint32_t SHADOW_SIZE = 1024 / 2;
+const uint32_t SHADOW_SIZE = 1024;
 
 rend::Texture2D depthMapTex;
+rend::Texture2D transparentMap;
 rend::Framebuffer depthMapFBO;
 
 // HUB Buffers
@@ -333,6 +346,7 @@ void drawMesh(
 
 void drawShadowMesh(
 	mesh::OpenGLMesh& mesh,
+	bool isTrans,
 	const glm::mat4& model);
 
 void drawSkybox(
@@ -466,13 +480,25 @@ void demo_init(ft::Table* table) {
 
 	depthMapTex.unbind(GL_TEXTURE0);
 
+	transparentMap.init();
+	transparentMap.bind(GL_TEXTURE0);
+	transparentMap.update(SHADOW_SIZE, SHADOW_SIZE, GL_RGBA, GL_FLOAT);
+
+	transparentMap.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	transparentMap.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	transparentMap.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+	transparentMap.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+	transparentMap.unbind(GL_TEXTURE0);
+
 	depthMapFBO.init();
 	depthMapFBO.bind();
 
 	depthMapFBO.attachDepthBuffer(depthMapTex);
+	depthMapFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, transparentMap);
 
-	depthMapFBO.drawBuffers(GL_NONE);
-	depthMapFBO.readBuffer(GL_NONE);
+	depthMapFBO.drawBuffers(GL_COLOR_ATTACHMENT0);
+	depthMapFBO.readBuffer(GL_COLOR_ATTACHMENT0);
 	depthMapFBO.unbind();
 
 
@@ -600,6 +626,8 @@ void demo_render_scene() {
 	skyboxProg.unbind();
 
 	depthMapTex.bind(GL_TEXTURE3);
+	transparentMap.bind(GL_TEXTURE4);
+
 	mainProg.bind();
 
 	mainProg.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
@@ -657,6 +685,7 @@ void demo_render_scene() {
 
 	dirtTM.normal.bind(GL_TEXTURE1);
 	dynamicCubemap.unbind(GL_TEXTURE0);
+	transparentMap.unbind(GL_TEXTURE4);
 	depthMapTex.unbind(GL_TEXTURE3);
 }
 
@@ -686,14 +715,16 @@ void demo_render_shadow() {
 	shadowProg.uniformMat4("proj", proj);
 	shadowProg.uniformMat4("view", view);
 
-	drawShadowMesh(floorMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
-	drawShadowMesh(cubeMesh, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(cylenderMesh, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(monkeyFaceMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(sphereMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(torusMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	shadowProg.uniform3("lightDir", light.direction.x, light.direction.y, light.direction.z);
 
-	drawShadowMesh(*meshes[mIndex], glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(floorMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
+	drawShadowMesh(cubeMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(cylenderMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(monkeyFaceMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(sphereMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(torusMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+
+	drawShadowMesh(*meshes[mIndex], true, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
 
 	shadowProg.unbind();
 	
@@ -823,6 +854,8 @@ void demo_render_cubemap() {
 		skyboxProg.unbind();
 
 		depthMapTex.bind(GL_TEXTURE3);
+		transparentMap.bind(GL_TEXTURE4);
+
 		mainProg.bind();
 
 		mainProg.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
@@ -838,6 +871,7 @@ void demo_render_cubemap() {
 
 		mainProg.unbind();
 
+		transparentMap.unbind(GL_TEXTURE4);
 		depthMapTex.unbind(GL_TEXTURE3);
 
 		dynamicCubemapFB.unbind();
@@ -866,7 +900,7 @@ void render_hub() {
 	if (isDepthShown) {
 		hubProgram.uniformMat4("model", model);
 
-		depthMapTex.bind(GL_TEXTURE0);
+		transparentMap.bind(GL_TEXTURE0);
 		hubProgram.bindAttributes();
 
 		hubVertices.bind();
@@ -878,7 +912,7 @@ void render_hub() {
 		glDrawArrays(GL_TRIANGLES, 0, hubVertices.count());
 
 		hubProgram.unbindAttribute();
-		depthMapTex.unbind(GL_TEXTURE0);
+		transparentMap.unbind(GL_TEXTURE0);
 	}
 
 	hubProgram.unbind();
@@ -932,7 +966,8 @@ void demo_release() {
 	// Framebuffer
 	//frameBuffer.release();
 
-	depthMapTex.release();
+	depthMapFBO.release();
+	transparentMap.release();
 	depthMapTex.release();
 
 	// Skybox
@@ -1005,13 +1040,20 @@ void drawMesh(
 	tex.unbind();
 }
 
-void drawShadowMesh(mesh::OpenGLMesh& mesh, const glm::mat4& model) {
+void drawShadowMesh(mesh::OpenGLMesh& mesh, bool isTrans, const glm::mat4& model) {
 	shadowProg.uniformMat4("model", model);
 	
+	glm::mat4 normalMatrix = glm::transpose(glm::inverse(model));
+
+	shadowProg.uniformMat4("normalMatrix", normalMatrix);
+	shadowProg.uniform1("isTrans", isTrans);
+
 	shadowProg.bindAttributes();
 
 	mesh.vertices.bind();
 	shadowProg.ptr("vertices", 3, GL_FLOAT);
+	mesh.normals.bind();
+	shadowProg.ptr("normals", 3, GL_FLOAT);
 	mesh.vertices.unbind();
 
 	mesh.index.bind();
@@ -1031,6 +1073,7 @@ void drawSkybox(
 
 	mesh.vertices.bind();
 	skyboxProg.ptr("vertices", 3, GL_FLOAT);
+	
 	mesh.vertices.unbind();
 
 	mesh.index.bind();

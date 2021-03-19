@@ -22,6 +22,7 @@ uniform sampler2D normalMap;
 uniform sampler2D specularMap;
 
 uniform sampler2D shadowDepthMap;
+uniform sampler2D transMap;
 
 // Layout
 in vec2 v_TexCoords;
@@ -67,6 +68,16 @@ float ShadowCalc(vec4 p) {
     return shadow;
 }
 
+vec4 transCalc(vec4 p) {
+    vec3 projCoords = p.xyz / p.w;
+
+    projCoords = projCoords * 0.5 + 0.5;
+
+    vec4 trans = texture(transMap, projCoords.xy);
+
+    return trans;
+}
+
 void main() {
 
     vec3 color = texture(albedo, v_TexCoords).rgb;
@@ -98,7 +109,15 @@ void main() {
     //vec3 finalColor = (a + d * (1.0 - s)) * color + s;
     float shadow = ShadowCalc(v_FragPosLightSpace);
 
-    vec3 finalColor = (a + (1.0 - shadow) * (d)) * color + s * (1.0 - shadow);
+    vec3 finalColor;
+
+    vec4 trans = transCalc(v_FragPosLightSpace);
+
+    if(trans.a > 0.0) {
+        finalColor = (a + (1.0 - shadow) * (d)) * color + s + trans.rgb * pow(trans.a, 16.0) * color;
+    } else {
+        finalColor = (a + (1.0 - shadow) * (d)) * color + s;
+    }
 
     //out_Color = vec4(n, 1.0)
     out_Color = vec4(finalColor, 1.0);
