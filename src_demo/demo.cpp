@@ -133,14 +133,24 @@ struct ShadowProgram : public rend::Program {
 		this->createUniform("normalMatrix");
 		this->createUniform("lightDir");
 		this->createUniform("isTrans");
+		this->createUniform("normalMap");
+		this->uniform1("normalMap", 0);
+		this->createUniform("isNormalMapped");
 
 		// Attribute
 		this->createAttributes("vertices", 0);
 		this->createAttributes("normals", 1);
+		this->createAttributes("tangents", 2);
+		this->createAttributes("biTangents", 3);
+		this->createAttributes("texCoords", 4);
 
 		this->bindAttributes();
 		this->enable("vertices");
 		this->enable("normals");
+		this->enable("tangents");
+		this->enable("biTangents");
+		this->enable("texCoords");
+
 		this->unbindAttribute();
 	}
 };
@@ -222,6 +232,8 @@ struct ReflectiveProgram : public rend::Program {
 		this->unbindAttribute();
 	}
 };
+
+static SDL_GLContext context;
 
 static Matrices matrices;
 static Light light;
@@ -355,6 +367,10 @@ void drawSkybox(
 
 void demo_init(ft::Table* table) {
 	ftw::init(table);
+
+	// Init Context and glew
+	context = SDL_GL_CreateContext(ftw::get()->app.getWindow());
+	glewInit();
 
 	ftw::get()->input.createInputMapping("toggle-grab", ftw::get()->input.createInputMapKey(input::Keys::KEY_TAB));
 	ftw::get()->input.createInputMapping("forward", ftw::get()->input.createInputMapKey(input::Keys::KEY_W));
@@ -695,13 +711,14 @@ void demo_render_shadow() {
 	float near_plane = 1.0f;
 	float far_plane = 32.0f;
 
-	glEnable(GL_CULL_FACE);
+	//glEnable(GL_CULL_FACE);
 
-	glCullFace(GL_FRONT);
+	//glCullFace(GL_FRONT);
 	//glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
 	depthMapFBO.bind();
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 	glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
-	glClear(GL_DEPTH_BUFFER_BIT);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	glm::mat4 proj = glm::ortho(-size, size, -size, size, near_plane, far_plane);
 	//glm::mat4 proj = camera.toProj();
@@ -717,6 +734,7 @@ void demo_render_shadow() {
 
 	shadowProg.uniform3("lightDir", light.direction.x, light.direction.y, light.direction.z);
 
+	shadowProg.uniform1("isNormalMapped", false);
 	drawShadowMesh(floorMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
 	drawShadowMesh(cubeMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
 	drawShadowMesh(cylenderMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
@@ -724,51 +742,20 @@ void demo_render_shadow() {
 	drawShadowMesh(sphereMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
 	drawShadowMesh(torusMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
 
-	drawShadowMesh(*meshes[mIndex], true, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	shadowProg.uniform1("isNormalMapped", isNormalMapped);
+	dirtTM.normal.bind(GL_TEXTURE0);
+	drawShadowMesh(*meshes[mIndex], (envType == ENV_REFRACT || envType == ENV_GLASS) ? true : false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	dirtTM.normal.unbind(GL_TEXTURE0);
 
 	shadowProg.unbind();
 	
 	depthMapFBO.unbind();
-	glCullFace(GL_BACK);
+	//glCullFace(GL_BACK);
 
-	glDisable(GL_CULL_FACE);
+	//glDisable(GL_CULL_FACE);
 }
 
 void demo_render_cubemap() {
-	/*
-	skyboxProg.bind();
-	glDepthMask(GL_FALSE);
-	glDepthFunc(GL_LEQUAL);
-
-	// Draw skybox
-	drawSkybox(cubeMesh, skyboxTex);
-
-	glDepthFunc(GL_LESS);
-	glDepthMask(GL_TRUE);
-
-	skyboxProg.unbind();
-
-	depthMapTex.bind(GL_TEXTURE3);
-	mainProg.bind();
-
-	mainProg.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
-
-
-	drawMesh(floorMesh, grassTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
-	drawMesh(cubeMesh, brickTM, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(cylenderMesh, beachSandTM, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(monkeyFaceMesh, seaFloorTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(sphereMesh, dirtTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawMesh(torusMesh, waterTM, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-
-
-	mainProg.unbind();
-
-	depthMapTex.unbind(GL_TEXTURE3);
-	*/
-
-	// glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f))
-
 	std::function<void(uint32_t, glm::mat4&, glm::vec3)> toView = [&](uint32_t index, glm::mat4& out, glm::vec3 pos) {
 		glm::mat4 la;
 
@@ -880,7 +867,6 @@ void demo_render_cubemap() {
 }
 
 void render_hub() {
-
 	glDisable(GL_DEPTH_TEST);
 
 	glm::mat4 proj = glm::ortho(0.0f, (float)ftw::get()->app.getWidth(), (float)ftw::get()->app.getHeight(), 0.0f);
@@ -1003,6 +989,8 @@ void demo_release() {
 
 	ftw::get()->input.clearInputMaps();
 
+	SDL_GL_DeleteContext(context);
+
 	ftw::release();
 }
 
@@ -1054,6 +1042,12 @@ void drawShadowMesh(mesh::OpenGLMesh& mesh, bool isTrans, const glm::mat4& model
 	shadowProg.ptr("vertices", 3, GL_FLOAT);
 	mesh.normals.bind();
 	shadowProg.ptr("normals", 3, GL_FLOAT);
+	mesh.tangents.bind();
+	shadowProg.ptr("tangents", 3, GL_FLOAT);
+	mesh.biTangents.bind();
+	shadowProg.ptr("biTangents", 3, GL_FLOAT);
+	mesh.texCoords.bind();
+	shadowProg.ptr("texCoords", 2, GL_FLOAT);
 	mesh.vertices.unbind();
 
 	mesh.index.bind();

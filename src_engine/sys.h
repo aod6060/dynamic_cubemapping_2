@@ -53,6 +53,8 @@ namespace app {
 	uint32_t getHeight();
 
 	void exit();
+
+	SDL_Window* getWindow();
 }
 
 namespace input {
@@ -380,6 +382,7 @@ namespace ft {
 			std::function<uint32_t()> getWidth;
 			std::function<uint32_t()> getHeight;
 			std::function<void()> exit;
+			std::function<SDL_Window*()> getWindow;
 		} app;
 
 		// Input

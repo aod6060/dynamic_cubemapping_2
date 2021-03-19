@@ -11,7 +11,7 @@ namespace app {
 	bool _isRunning = true;
 	
 	SDL_Window* _window = nullptr;
-	SDL_GLContext _context = nullptr;
+	//SDL_GLContext _context = nullptr;
 
 
 	// Library
@@ -76,8 +76,8 @@ namespace app {
 
 
 		// Create Context
-		_context = SDL_GL_CreateContext(_window);
-		glewInit();
+		//_context = SDL_GL_CreateContext(_window);
+		//glewInit();
 
 		input::init();
 
@@ -222,8 +222,8 @@ namespace app {
 
 		ft::release(&_func_table);
 
-		
-		SDL_GL_DeleteContext(_context);
+
+		//SDL_GL_DeleteContext(_context);
 		SDL_DestroyWindow(_window);
 		SDL_Quit();
 	}
@@ -240,4 +240,7 @@ namespace app {
 		_isRunning = false;
 	}
 
+	SDL_Window* getWindow() {
+		return _window;
+	}
 }

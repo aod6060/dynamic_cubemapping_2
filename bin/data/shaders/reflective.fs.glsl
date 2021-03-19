@@ -137,20 +137,6 @@ vec3 blur3D(samplerCube s, vec3 tc, float blurSize) {
     return (hurBlur(s, tc, blurSize) + verBlur(s, tc, blurSize) + depthBlur(s, tc, blurSize)) / 3.0;
 }
 
-/*
-    vec3 uv = R2;
-    vec3 t = uv;
-    float pixelSize = 1024.0;
-
-    float dx = 8.0 * (1.0 / pixelSize);
-    float dy = 8.0 * (1.0 / pixelSize);
-    float dz = 8.0 * (1.0 / pixelSize);
-
-    t.x = dx * floor(uv.x/dx);
-    t.y = dy * floor(uv.y/dy);
-    t.z = dz * floor(uv.z/dz);
-*/
-
 vec3 pixels(vec3 tc) {
     vec3 uv = tc;
     vec3 t;
@@ -196,19 +182,6 @@ void main() {
     }
 
     // Section for pixelate
-    /*
-        vec3 uv = R2;
-        vec3 t = uv;
-        float pixelSize = 1024.0;
-
-        float dx = 8.0 * (1.0 / pixelSize);
-        float dy = 8.0 * (1.0 / pixelSize);
-        float dz = 8.0 * (1.0 / pixelSize);
-
-        t.x = dx * floor(uv.x/dx);
-        t.y = dy * floor(uv.y/dy);
-        t.z = dz * floor(uv.z/dz);
-    */
     if(fxType == FX_PIXELATED) {
         if(envType == ENV_GLASS) {
             R1 = pixels(R1);
@@ -252,48 +225,7 @@ void main() {
     else if(fxType == FX_INVERT) {
         color = 1.0 - color;
     }
-
-    //vec3 R = reflect(I, n);
     
-    //vec3 R = refract(I, n, 1.1);
-    
-
-    //vec3 R = reflect(I, n) * 0.2 + refract(I, n, 1.2) * 0.8;
-    //vec3 R1 = reflect(I, n);
-    //vec3 R2 = refract(I, n, 1.1);
-
-    //vec3 c1 = texture(refTex, R1).rgb;
-    //vec3 c2 = texture(refTex, R2).rgb;
-
-    //vec3 c1 = texture(refTex, R1).rgb;
-    //vec3 c2 = blur3D(refTex, R2, 16.0 / 1024.0);
-    /*
-    vec3 uv = R2;
-    vec3 t = uv;
-    float pixelSize = 1024.0;
-
-    float dx = 8.0 * (1.0 / pixelSize);
-    float dy = 8.0 * (1.0 / pixelSize);
-    float dz = 8.0 * (1.0 / pixelSize);
-
-    t.x = dx * floor(uv.x/dx);
-    t.y = dy * floor(uv.y/dy);
-    t.z = dz * floor(uv.z/dz);
-    */
-    //vec3 c2 = texture(refTex, R2).rgb;
-
-    //vec3 color = mix(c2, c1, 0.1);
-
-    // Invert
-    //color = 1.0 - color;
-    // Black White
-    //color.rgb = vec3((color.r + color.g + color.b) / 3.0);
-    // Sepia Filter
-    //float grey = dot(color, vec3(0.299, 0.587, 0.114));
-    //color = grey * vec3(1.2, 1.0, 0.8);
-
-    //vec3 color = texture(refTex, R).rgb;
-
     vec3 h = normalize(v + l);
 
     float ndotl = max(dot(n, l), 0.0);
@@ -313,7 +245,7 @@ void main() {
     vec4 trans = transCalc(v_FragPosLightSpace);
 
     if(trans.a > 0.0) {
-        finalColor = (a + (1.0 - shadow) * (d)) * color + s + trans.rgb * pow(trans.a, 16.0) * color;
+        finalColor = (a + (1.0 - shadow) * (d)) * color + s + trans.rgb * trans.a * color * d + trans.rgb * pow(trans.a, 16.0) * color;
     } else {
         finalColor = (a + (1.0 - shadow) * (d)) * color + s;
     }

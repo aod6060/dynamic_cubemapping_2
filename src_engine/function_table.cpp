@@ -9,6 +9,7 @@ namespace ft {
 		table->app.getWidth = app::getWidth;
 		table->app.getHeight = app::getHeight;
 		table->app.exit = app::exit;
+		table->app.getWindow = app::getWindow;
 		
 		// Input
 		
