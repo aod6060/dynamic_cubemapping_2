@@ -170,6 +170,8 @@ namespace rend {
 		void genMipmaps();
 
 		void update(image::Image& image);
+		void update(SDL_Surface* surf);
+
 		void update(uint32_t width, uint32_t height, uint32_t bbp);
 		void update(uint32_t width, uint32_t height, GLenum format, GLenum type);
 	};
@@ -349,5 +351,55 @@ namespace transform {
 		glm::mat4 toView();
 
 	};
+
+}
+
+
+namespace ui {
+
+
+	void init();
+	
+	void release();
+
+	void bind();
+	
+	void setProjection(const glm::mat4& m);
+	
+	void setView(const glm::mat4& m);
+	
+	void setModel(const glm::mat4& m);
+	
+	void setColor(const glm::vec4& color);
+
+	void unbind();
+
+	void render();
+
+	void render50();
+
+	void textSize(std::string str, int32_t& width, int32_t& height);
+
+	void renderText(std::string str);
+
+	struct IComponent {
+		virtual void init() = 0;
+		virtual void doEvent(SDL_Event& e) = 0;
+		virtual void update(float delta) = 0;
+		virtual void render() = 0;
+		virtual void release() = 0;
+	};
+
+	struct IContainer {
+		virtual void add(IComponent* comp) = 0;
+		virtual void remove(IComponent* comp) = 0;
+		virtual uint32_t count() = 0;
+	};
+
+	struct IAction {
+		virtual void setAction(std::function<void(IAction*)> actionCB) = 0;
+	};
+
+
 
 }

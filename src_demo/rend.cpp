@@ -389,6 +389,10 @@ namespace rend {
 	}
 
 	void Texture2D::update(image::Image& image) {
+		this->width = image.width;
+		this->height = image.height;
+		this->bbp = image.bbp;
+
 		glTexImage2D(
 			GL_TEXTURE_2D,
 			0,
@@ -402,7 +406,29 @@ namespace rend {
 		);
 	}
 
+	void Texture2D::update(SDL_Surface* surf) {
+		this->width = surf->w;
+		this->height = surf->h;
+		this->bbp = surf->format->BytesPerPixel;
+
+		glTexImage2D(
+			GL_TEXTURE_2D,
+			0,
+			(surf->format->BytesPerPixel == 4) ? GL_RGBA : GL_RGB,
+			surf->w,
+			surf->h,
+			0,
+			(surf->format->BytesPerPixel == 4) ? GL_RGBA : GL_RGB,
+			GL_UNSIGNED_BYTE,
+			surf->pixels);
+	}
+
 	void Texture2D::update(uint32_t width, uint32_t height, uint32_t bbp) {
+		
+		this->width = width;
+		this->height = height;
+		this->bbp = bbp;
+
 		glTexImage2D(
 			GL_TEXTURE_2D,
 			0,
@@ -416,6 +442,10 @@ namespace rend {
 	}
 
 	void Texture2D::update(uint32_t width, uint32_t height, GLenum format, GLenum type) {
+
+		this->width = width;
+		this->height = height;
+
 		glTexImage2D(
 			GL_TEXTURE_2D,
 			0,

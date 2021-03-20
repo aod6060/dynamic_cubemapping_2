@@ -3,6 +3,7 @@
 
 namespace app {
 	typedef void(*module_init_def)(ft::Table*);
+	typedef void(*module_event_def)(SDL_Event&);
 	typedef void(*module_update_def)(float);
 	typedef void(*module_render_def)();
 	typedef void(*module_release_def)();
@@ -18,6 +19,7 @@ namespace app {
 	struct Library {
 		HINSTANCE library = nullptr;
 		module_init_def init = nullptr;
+		module_event_def doEvent = nullptr;
 		module_update_def update = nullptr;
 		module_render_def render = nullptr;
 		module_release_def release = nullptr;
@@ -25,10 +27,11 @@ namespace app {
 		void initLibrary(std::string path) {
 			this->library = LoadLibrary(path.c_str());
 
-			this->init = (module_init_def)GetProcAddress(_library.library, "demo_init");
-			this->update = (module_update_def)GetProcAddress(_library.library, "demo_update");
-			this->render = (module_render_def)GetProcAddress(_library.library, "demo_render");
-			this->release = (module_release_def)GetProcAddress(_library.library, "demo_release");
+			this->init = (module_init_def)GetProcAddress(library, "demo_init");
+			this->doEvent = (module_event_def)GetProcAddress(library, "demo_event");
+			this->update = (module_update_def)GetProcAddress(library, "demo_update");
+			this->render = (module_render_def)GetProcAddress(library, "demo_render");
+			this->release = (module_release_def)GetProcAddress(library, "demo_release");
 
 		}
 
@@ -36,6 +39,7 @@ namespace app {
 			FreeLibrary(this->library);
 
 			this->init = nullptr;
+			this->doEvent = nullptr;
 			this->update = nullptr;
 			this->render = nullptr;
 			this->release = nullptr;
@@ -134,6 +138,8 @@ namespace app {
 				}
 
 				input::doEvent(e);
+
+				_library.doEvent(e);
 			}
 
 

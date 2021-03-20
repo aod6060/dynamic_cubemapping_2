@@ -372,6 +372,8 @@ void demo_init(ft::Table* table) {
 	context = SDL_GL_CreateContext(ftw::get()->app.getWindow());
 	glewInit();
 
+	ui::init();
+
 	ftw::get()->input.createInputMapping("toggle-grab", ftw::get()->input.createInputMapKey(input::Keys::KEY_TAB));
 	ftw::get()->input.createInputMapping("forward", ftw::get()->input.createInputMapKey(input::Keys::KEY_W));
 	ftw::get()->input.createInputMapping("backward", ftw::get()->input.createInputMapKey(input::Keys::KEY_S));
@@ -579,6 +581,10 @@ void demo_init(ft::Table* table) {
 	dynamicCubemapFB.drawBuffers(GL_COLOR_ATTACHMENT0);
 
 	dynamicCubemapFB.unbind();
+}
+
+void demo_event(SDL_Event& e) {
+
 }
 
 void demo_update(float delta) {
@@ -947,11 +953,6 @@ void demo_release() {
 	hubTexCoords.release();
 	hubVertices.release();
 
-	//hubProgram.release();
-
-	// Framebuffer
-	//frameBuffer.release();
-
 	depthMapFBO.release();
 	transparentMap.release();
 	depthMapTex.release();
@@ -988,6 +989,8 @@ void demo_release() {
 	mainProg.release();
 
 	ftw::get()->input.clearInputMaps();
+
+	ui::release();
 
 	SDL_GL_DeleteContext(context);
 
