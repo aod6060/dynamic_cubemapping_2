@@ -98,4 +98,45 @@ namespace transform {
 			glm::translate(glm::mat4(1.0f), -this->position);
 	}
 
+
+	// Path
+	void Path::add(PathData data) {
+		this->pathData.push_back(data);
+	}
+
+	void Path::clear() {
+		this->pathData.clear();
+	}
+
+	void Path::update(float delta) {
+		if (time > maxTime) {
+			time = 0.0f;
+			this->index += 1;
+
+			if (this->index >= this->pathData.size()) {
+				this->index = 0;
+			}
+		}
+		else {
+			time += delta;
+		}
+	}
+
+	glm::vec3 Path::getPosition() {
+		glm::vec3 min_p = this->pathData[index].position;
+		glm::vec3 max_p;
+
+		if (index + 1 >= this->pathData.size()) {
+			max_p = this->pathData[0].position;
+		}
+		else {
+			max_p = this->pathData[index + 1].position;
+		}
+
+		return this->l(min_p, max_p, time);
+	}
+
+	glm::vec3 Path::l(glm::vec3 min, glm::vec3 max, float t) {
+		return (max - min) * t + min;
+	}
 }

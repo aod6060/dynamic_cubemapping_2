@@ -352,6 +352,32 @@ namespace transform {
 
 	};
 
+
+	struct Path {
+		struct PathData {
+			glm::vec3 position;
+
+			PathData() {}
+
+			PathData(const glm::vec3& position) {
+				this->position = position;
+			}
+		};
+
+		uint32_t index = 0;
+		float time = 0.0f;
+		float maxTime = 1.0f;
+		std::vector<PathData> pathData;
+
+		void add(PathData data);
+		void clear();
+
+		void update(float delta);
+
+		glm::vec3 getPosition();
+
+		glm::vec3 l(glm::vec3 min, glm::vec3 max, float t);
+	};
 }
 
 

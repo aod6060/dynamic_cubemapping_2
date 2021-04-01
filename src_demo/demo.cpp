@@ -326,44 +326,50 @@ static TextureMaterial waterTM;
 static transform::Camera camera;
 
 static rend::Cubemap skyboxTex;
+static rend::Cubemap skybox2Tex;
+static rend::Cubemap skybox3Tex;
+
+static std::vector<rend::Cubemap*> skyboxes;
+static uint32_t currentSkybox = 0;
 
 static float yrot = 0.0f;
 
-const uint32_t SHADOW_SIZE = 1024;
+static const uint32_t SHADOW_SIZE = 1024;
 
-rend::Texture2D depthMapTex;
-rend::Texture2D transparentMap;
-rend::Framebuffer depthMapFBO;
+static rend::Texture2D depthMapTex;
+static rend::Texture2D transparentMap;
+static rend::Framebuffer depthMapFBO;
 
 // HUB Buffers
-rend::VertexBuffer hubVertices;
-rend::VertexBuffer hubTexCoords;
+static rend::VertexBuffer hubVertices;
+static rend::VertexBuffer hubTexCoords;
 
-bool isDepthShown = false;
-bool isCasticMapShown = false;
+static bool isDepthShown = false;
+static bool isCasticMapShown = false;
 
 // Dynamic Cubemap
-const uint32_t DYNAMIC_CM_SIZE = 1024;
+static const uint32_t DYNAMIC_CM_SIZE = 1024;
 
-rend::Cubemap dynamicCubemap;
-rend::Renderbuffer dynamicCubemapDepth;
-rend::Framebuffer dynamicCubemapFB;
+static rend::Cubemap dynamicCubemap;
+static rend::Renderbuffer dynamicCubemapDepth;
+static rend::Framebuffer dynamicCubemapFB;
 
 
-bool isNormalMapped = false;
-int envType = ENV_REFLECT;
-int fxType = FX_REGULAR;
-bool canUpdate = false;
+static bool isNormalMapped = false;
+static int envType = ENV_REFLECT;
+static int fxType = FX_REGULAR;
+static bool canUpdate = false;
 
-ui::UIContainer container;
+static ui::UIContainer container;
 
-ui::CheckBox showDepthCB;
-ui::CheckBox showCasticMapCB;
-ui::SelectButton selectMeshSB;
-ui::CheckBox normalMappedCB;
-ui::SelectButton selectEnvTypeSB;
-ui::SelectButton selectFXTypeSB;
-ui::CheckBox canUpdateCB;
+static ui::CheckBox showDepthCB;
+static ui::CheckBox showCasticMapCB;
+static ui::SelectButton selectMeshSB;
+static ui::CheckBox normalMappedCB;
+static ui::SelectButton selectEnvTypeSB;
+static ui::SelectButton selectFXTypeSB;
+static ui::CheckBox canUpdateCB;
+static ui::SelectButton selectSkyboxSB;
 
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
@@ -396,15 +402,6 @@ void demo_init(ft::Table* table) {
 	ftw::get()->input.createInputMapping("move-up", ftw::get()->input.createInputMapKey(input::Keys::KEY_SPACE));
 	ftw::get()->input.createInputMapping("move-down", ftw::get()->input.createInputMapKey(input::Keys::KEY_LSHIFT));
 	ftw::get()->input.setGrab(false);
-
-	
-	/*
-	ftw::get()->input.createInputMapping("toggle-depth", ftw::get()->input.createInputMapKey(input::Keys::KEY_1));
-	ftw::get()->input.createInputMapping("next-mesh", ftw::get()->input.createInputMapKey(input::Keys::KEY_2));
-	ftw::get()->input.createInputMapping("toggle-normalMap", ftw::get()->input.createInputMapKey(input::Keys::KEY_3));
-	ftw::get()->input.createInputMapping("next-env-type", ftw::get()->input.createInputMapKey(input::Keys::KEY_4));
-	ftw::get()->input.createInputMapping("next-fx-type", ftw::get()->input.createInputMapKey(input::Keys::KEY_5));
-	*/
 
 	glEnable(GL_DEPTH_TEST);
 
@@ -498,6 +495,29 @@ void demo_init(ft::Table* table) {
 		"data/textures/skybox/down.png",
 		"data/textures/skybox/north.png",
 		"data/textures/skybox/south.png");
+
+	rend::createCubemap(
+		skybox2Tex,
+		"data/textures/skybox2/east.png",
+		"data/textures/skybox2/west.png",
+		"data/textures/skybox2/up.png",
+		"data/textures/skybox2/down.png",
+		"data/textures/skybox2/north.png",
+		"data/textures/skybox2/south.png");
+
+	rend::createCubemap(
+		skybox3Tex,
+		"data/textures/skybox3/east.png",
+		"data/textures/skybox3/west.png",
+		"data/textures/skybox3/up.png",
+		"data/textures/skybox3/down.png",
+		"data/textures/skybox3/north.png",
+		"data/textures/skybox3/south.png");
+
+
+	skyboxes.push_back(&skyboxTex);
+	skyboxes.push_back(&skybox2Tex);
+	skyboxes.push_back(&skybox3Tex);
 
 	//frameBuffer.init();
 
@@ -715,6 +735,19 @@ void demo_init(ft::Table* table) {
 		canUpdate = canUpdateCB.isChecked();
 	});
 
+	// Selct Skybox SB
+	selectSkyboxSB.setColor(glm::vec4(1.0f));
+	selectSkyboxSB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	selectSkyboxSB.setPosition(glm::vec2(32.0f, 256.0f));
+
+	selectSkyboxSB.add(ui::SelectButton::SelectButtonValue("Skybox: Sunny", 0));
+	selectSkyboxSB.add(ui::SelectButton::SelectButtonValue("Skybox: Dusk", 1));
+	selectSkyboxSB.add(ui::SelectButton::SelectButtonValue("Skybox: Cloudy", 2));
+
+	selectSkyboxSB.setAction([&](ui::IAction* action) {
+		currentSkybox = selectSkyboxSB.getCurrentValue()->value;
+	});
+
 	container.add(&showDepthCB);
 	container.add(&showCasticMapCB);
 	container.add(&selectMeshSB);
@@ -722,6 +755,7 @@ void demo_init(ft::Table* table) {
 	container.add(&selectEnvTypeSB);
 	container.add(&selectFXTypeSB);
 	container.add(&canUpdateCB);
+	container.add(&selectSkyboxSB);
 
 	container.init();
 
@@ -765,7 +799,7 @@ void demo_render_scene() {
 	glDepthFunc(GL_LEQUAL);
 
 	// Draw skybox
-	drawSkybox(cubeMesh, skyboxTex);
+	drawSkybox(cubeMesh, *skyboxes[currentSkybox]);
 
 	glDepthFunc(GL_LESS);
 	glDepthMask(GL_TRUE);
@@ -964,7 +998,7 @@ void demo_render_cubemap() {
 		glDepthFunc(GL_LEQUAL);
 
 		// Draw skybox
-		drawSkybox(cubeMesh, skyboxTex);
+		drawSkybox(cubeMesh, *skyboxes[currentSkybox]);
 
 		glDepthFunc(GL_LESS);
 		glDepthMask(GL_TRUE);
@@ -1109,6 +1143,10 @@ void demo_release() {
 	depthMapTex.release();
 
 	// Skybox
+	skyboxes.clear();
+
+	skybox3Tex.release();
+	skybox2Tex.release();
 	skyboxTex.release();
 	// Texture2D
 	grassTM.release();
