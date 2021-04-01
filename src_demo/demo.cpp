@@ -340,6 +340,7 @@ rend::VertexBuffer hubVertices;
 rend::VertexBuffer hubTexCoords;
 
 bool isDepthShown = false;
+bool isCasticMapShown = false;
 
 // Dynamic Cubemap
 const uint32_t DYNAMIC_CM_SIZE = 1024;
@@ -352,13 +353,17 @@ rend::Framebuffer dynamicCubemapFB;
 bool isNormalMapped = false;
 int envType = ENV_REFLECT;
 int fxType = FX_REGULAR;
+bool canUpdate = false;
 
 ui::UIContainer container;
-ui::Label test;
-ui::Button testButton;
-ui::CheckBox testCheckBox;
-ui::SelectButton testSelectButton;
-ui::Slider testSlider;
+
+ui::CheckBox showDepthCB;
+ui::CheckBox showCasticMapCB;
+ui::SelectButton selectMeshSB;
+ui::CheckBox normalMappedCB;
+ui::SelectButton selectEnvTypeSB;
+ui::SelectButton selectFXTypeSB;
+ui::CheckBox canUpdateCB;
 
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
@@ -390,11 +395,16 @@ void demo_init(ft::Table* table) {
 	ftw::get()->input.createInputMapping("strafe-right", ftw::get()->input.createInputMapKey(input::Keys::KEY_D));
 	ftw::get()->input.createInputMapping("move-up", ftw::get()->input.createInputMapKey(input::Keys::KEY_SPACE));
 	ftw::get()->input.createInputMapping("move-down", ftw::get()->input.createInputMapKey(input::Keys::KEY_LSHIFT));
+	ftw::get()->input.setGrab(false);
+
+	
+	/*
 	ftw::get()->input.createInputMapping("toggle-depth", ftw::get()->input.createInputMapKey(input::Keys::KEY_1));
 	ftw::get()->input.createInputMapping("next-mesh", ftw::get()->input.createInputMapKey(input::Keys::KEY_2));
 	ftw::get()->input.createInputMapping("toggle-normalMap", ftw::get()->input.createInputMapKey(input::Keys::KEY_3));
 	ftw::get()->input.createInputMapping("next-env-type", ftw::get()->input.createInputMapKey(input::Keys::KEY_4));
 	ftw::get()->input.createInputMapping("next-fx-type", ftw::get()->input.createInputMapKey(input::Keys::KEY_5));
+	*/
 
 	glEnable(GL_DEPTH_TEST);
 
@@ -591,86 +601,127 @@ void demo_init(ft::Table* table) {
 
 	dynamicCubemapFB.unbind();
 
-	// Label
-	test.setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
-	test.setPosition(glm::vec2(32.0f, 32.0f));
-	test.setText("This is a test :)");
-
-	// Button
-	testButton.setColor(glm::vec4(1.0f));
-	testButton.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0));
-	testButton.setActiveColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
-	testButton.setPosition(glm::vec2(32.0f, 64.0f));
-	testButton.setText("Test Button");
-
-	testButton.setAction([&](ui::IAction* action) {
-		test.setText("I pressed a button");
-		std::cout << "I pressed a button" << std::endl;
+	// Show Depth CB
+	showDepthCB.setColor(glm::vec4(1.0f));
+	showDepthCB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	showDepthCB.setOffColor(glm::vec4(glm::vec3(0.25f), 1.0f));
+	showDepthCB.setOnColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
+	showDepthCB.setText("Show Depth");
+	showDepthCB.setPosition(glm::vec2(32.0f, 32.0f));
+	showDepthCB.setAction([&](ui::IAction* action) {
+		isDepthShown = showDepthCB.isChecked();
 	});
 
-	// CheckBox
-	testCheckBox.setColor(glm::vec4(1.0f));
-	testCheckBox.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
-	testCheckBox.setOffColor(glm::vec4(glm::vec3(0.25f), 1.0f));
-	testCheckBox.setOnColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
-	testCheckBox.setText("Test Checkbox");
-	testCheckBox.setPosition(glm::vec2(32.0f, 96.0f));
-	
-	testCheckBox.setAction([&](ui::IAction* action) {
-		std::stringstream ss;
-
-		std::string str = (((ui::CheckBox*)action)->isChecked()) ? "true" : "false";
-
-		ss << "Test CheckBox Value: " << str;
-
-		test.setText(ss.str());
-
-		std::cout << ss.str() << std::endl;
+	// Show Castic Map CB
+	showCasticMapCB.setColor(glm::vec4(1.0f));
+	showCasticMapCB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	showCasticMapCB.setOffColor(glm::vec4(glm::vec3(0.25f), 1.0f));
+	showCasticMapCB.setOnColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
+	showCasticMapCB.setText("Show Castic Map");
+	showCasticMapCB.setPosition(glm::vec2(32.0f, 64.0f));
+	showCasticMapCB.setAction([&](ui::IAction* action) {
+		isCasticMapShown = showCasticMapCB.isChecked();
 	});
 
-	// Select Button
-	testSelectButton.setColor(glm::vec4(1.0f));
-	testSelectButton.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
-	testSelectButton.add(ui::SelectButton::SelectButtonValue("hello", 0));
-	testSelectButton.add(ui::SelectButton::SelectButtonValue("goodbye", 1));
-	testSelectButton.add(ui::SelectButton::SelectButtonValue("What!", 2));
-	testSelectButton.add(ui::SelectButton::SelectButtonValue("OH NO!!!", 3));
-	testSelectButton.add(ui::SelectButton::SelectButtonValue("DAMNIT!!!", 4));
-	testSelectButton.add(ui::SelectButton::SelectButtonValue("SHIT!!!", 5));
-	testSelectButton.add(ui::SelectButton::SelectButtonValue("NO!!!", 6));
-	testSelectButton.setPosition(glm::vec2(32.0f, 128.0f));
-	
-	testSelectButton.setAction([&](ui::IAction* action) {
+	// Select Mesh
+	/*
+		meshes.push_back(&cubeMesh); // 0
+		meshes.push_back(&sphereMesh); // 1
+		meshes.push_back(&sphere2Mesh); // 2
+		meshes.push_back(&cylenderMesh); // 3
+		meshes.push_back(&torusMesh); // 4
+		meshes.push_back(&monkeyFaceMesh); // 5
+	*/
+	selectMeshSB.setColor(glm::vec4(1.0f));
+	selectMeshSB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	selectMeshSB.setPosition(glm::vec2(32.0f, 96.0f));
 
-		std::stringstream ss;
+	selectMeshSB.add(ui::SelectButton::SelectButtonValue("Mesh: Cube Mesh", 0));
+	selectMeshSB.add(ui::SelectButton::SelectButtonValue("Mesh: Sphere Mesh", 1));
+	selectMeshSB.add(ui::SelectButton::SelectButtonValue("Mesh: Sphere 2 Mesh", 2));
+	selectMeshSB.add(ui::SelectButton::SelectButtonValue("Mesh: Cylender Mesh", 3));
+	selectMeshSB.add(ui::SelectButton::SelectButtonValue("Mesh: Torus Mesh", 4));
+	selectMeshSB.add(ui::SelectButton::SelectButtonValue("Mesh: Monkey Mesh", 5));
 
-		ss << "Test Select Button: " << testSelectButton.getCurrentValue()->value << ": " << testSelectButton.getCurrentValue()->name;
-
-		test.setText(ss.str());
-
-	});
-
-	// Slider
-	testSlider.setColor(glm::vec4(1.0f));
-	testSlider.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
-	testSlider.setNobColor(glm::vec4(glm::vec3(0.75f), 1.0f));
-	testSlider.setPositions(glm::vec2(32.0f, 160.0f));
-	testSlider.setMinRange(0.0f);
-	testSlider.setMaxRange(1024.0f);
-	testSlider.setAction([&](ui::IAction* action) {
-		std::stringstream ss;
-
-		ss << "Test Slider: " << testSlider.getValue();
-
-		test.setText(ss.str());
+	selectMeshSB.setAction([&](ui::IAction* action) {
+		mIndex = selectMeshSB.getCurrentValue()->value;
 	});
 
 
-	container.add(&test);
-	container.add(&testButton);
-	container.add(&testCheckBox);
-	container.add(&testSelectButton);
-	container.add(&testSlider);
+	// NormalMaped CB
+	normalMappedCB.setColor(glm::vec4(1.0f));
+	normalMappedCB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	normalMappedCB.setOffColor(glm::vec4(glm::vec3(0.25f), 1.0f));
+	normalMappedCB.setOnColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
+	normalMappedCB.setText("Use Normalmapping");
+	normalMappedCB.setPosition(glm::vec2(32.0f, 128.0f));
+	normalMappedCB.setAction([&](ui::IAction* action) {
+		isNormalMapped = normalMappedCB.isChecked();
+	});
+
+	// select envType SB
+	/*
+		ENV_REFLECT 0
+		ENV_REFRACT 1
+		ENV_GLASS 2
+	*/
+	selectEnvTypeSB.setColor(glm::vec4(1.0f));
+	selectEnvTypeSB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	selectEnvTypeSB.setPosition(glm::vec2(32.0f, 160.0f));
+
+	selectEnvTypeSB.add(ui::SelectButton::SelectButtonValue("EnvType: Reflective Surface", ENV_REFLECT));
+	selectEnvTypeSB.add(ui::SelectButton::SelectButtonValue("EnvType: Refractive Surface", ENV_REFRACT));
+	selectEnvTypeSB.add(ui::SelectButton::SelectButtonValue("EnvType: Glass Surface", ENV_GLASS));
+
+	selectEnvTypeSB.setAction([&](ui::IAction* action) {
+		//mIndex = selectMeshSB.getCurrentValue()->value;
+		envType = selectEnvTypeSB.getCurrentValue()->value;
+	});
+
+	// select fxType SB
+	/*
+		FX_REGULAR 0
+		FX_BK 1
+		FX_SEPAI 2
+		FX_INVERT 3
+		FX_BLUR 4
+		FX_PIXELATED 5
+	*/
+	selectFXTypeSB.setColor(glm::vec4(1.0f));
+	selectFXTypeSB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	selectFXTypeSB.setPosition(glm::vec2(32.0f, 192.0f));
+
+	selectFXTypeSB.add(ui::SelectButton::SelectButtonValue("FXType: Normal", FX_REGULAR));
+	selectFXTypeSB.add(ui::SelectButton::SelectButtonValue("FXType: Black and White", FX_BK));
+	selectFXTypeSB.add(ui::SelectButton::SelectButtonValue("FXType: Sepai Filter", FX_SEPAI));
+	selectFXTypeSB.add(ui::SelectButton::SelectButtonValue("FXType: Inverted Color", FX_INVERT));
+	selectFXTypeSB.add(ui::SelectButton::SelectButtonValue("FXType: 3D Blur", FX_BLUR));
+	selectFXTypeSB.add(ui::SelectButton::SelectButtonValue("FXType: 3D Pixelation", FX_PIXELATED));
+
+	selectFXTypeSB.setAction([&](ui::IAction* action) {
+		//mIndex = selectMeshSB.getCurrentValue()->value;
+		fxType = selectFXTypeSB.getCurrentValue()->value;
+	});
+
+	// Can Update CB
+	canUpdateCB.setColor(glm::vec4(1.0f));
+	canUpdateCB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	canUpdateCB.setOffColor(glm::vec4(glm::vec3(0.25f), 1.0f));
+	canUpdateCB.setOnColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
+	canUpdateCB.setText("Can Update");
+	canUpdateCB.setPosition(glm::vec2(32.0f, 224.0f));
+	canUpdateCB.setAction([&](ui::IAction* action) {
+		//isNormalMapped = normalMappedCB.isChecked();
+		canUpdate = canUpdateCB.isChecked();
+	});
+
+	container.add(&showDepthCB);
+	container.add(&showCasticMapCB);
+	container.add(&selectMeshSB);
+	container.add(&normalMappedCB);
+	container.add(&selectEnvTypeSB);
+	container.add(&selectFXTypeSB);
+	container.add(&canUpdateCB);
 
 	container.init();
 
@@ -678,8 +729,6 @@ void demo_init(ft::Table* table) {
 	container.setColor(glm::vec4(0.25, 0.25, 0.25, 0.5));
 	container.setPosition(glm::vec2(0.0, 0.0));
 	container.setSize(glm::vec2(ftw::get()->app.getWidth(), ftw::get()->app.getHeight()));
-
-
 }
 
 void demo_event(SDL_Event& e) {
@@ -694,48 +743,19 @@ void demo_update(float delta) {
 		container.setActive(!container.isActive());
 	}
 
+
 	if (!container.isActive()) {
-		if (ftw::get()->input.isInputMapPressOnce("toggle-depth")) {
-			isDepthShown = !isDepthShown;
-		}
-
-		if (ftw::get()->input.isInputMapPressOnce("next-mesh")) {
-
-			mIndex += 1;
-
-			if (mIndex >= meshes.size()) {
-				mIndex = 0;
-			}
-		}
-
-		if (ftw::get()->input.isInputMapPressOnce("toggle-normalMap")) {
-			isNormalMapped = !isNormalMapped;
-		}
-
-		if (ftw::get()->input.isInputMapPressOnce("next-env-type")) {
-			envType += 1;
-
-			if (envType >= ENV_SIZE) {
-				envType = 0;
-			}
-		}
-
-		if (ftw::get()->input.isInputMapPressOnce("next-fx-type")) {
-			fxType += 1;
-			if (fxType >= FX_SIZE) {
-				fxType = 0;
-			}
-		}
-
 		camera.update(delta);
-
+	}
+	
+	if (canUpdate) {
 		yrot += 32.0f * delta;
 
 		if (yrot > 360.0f) {
 			yrot -= 360.0f;
 		}
 	}
-	
+
 	container.update(delta);
 }
 
@@ -983,18 +1003,40 @@ void render_hub() {
 	glm::mat4 proj = glm::ortho(0.0f, (float)ftw::get()->app.getWidth(), (float)ftw::get()->app.getHeight(), 0.0f);
 	glm::mat4 view = glm::mat4(1.0f);
 
-	glm::mat4 model =
-		glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
-		glm::scale(glm::mat4(1.0f), glm::vec3(256.0f, 256.0f, 0.0f));
-
-
 
 	hubProgram.bind();
 	
 	hubProgram.uniformMat4("proj", proj);
 	hubProgram.uniformMat4("view", view);
 
+	glm::mat4 model =
+		glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) *
+		glm::scale(glm::mat4(1.0f), glm::vec3(256.0f, 256.0f, 0.0f));
+
+
 	if (isDepthShown) {
+		hubProgram.uniformMat4("model", model);
+
+		depthMapTex.bind(GL_TEXTURE0);
+		hubProgram.bindAttributes();
+
+		hubVertices.bind();
+		hubProgram.ptr("vertices", 3, GL_FLOAT);
+		hubTexCoords.bind();
+		hubProgram.ptr("texCoords", 2, GL_FLOAT);
+		hubTexCoords.unbind();
+
+		glDrawArrays(GL_TRIANGLES, 0, hubVertices.count());
+
+		hubProgram.unbindAttribute();
+		depthMapTex.unbind(GL_TEXTURE0);
+	}
+
+	model =
+		glm::translate(glm::mat4(1.0f), glm::vec3(ftw::get()->app.getWidth() - 256.0f, 0.0f, 0.0f)) *
+		glm::scale(glm::mat4(1.0f), glm::vec3(256.0f, 256.0f, 0.0f));
+
+	if (isCasticMapShown) {
 		hubProgram.uniformMat4("model", model);
 
 		transparentMap.bind(GL_TEXTURE0);

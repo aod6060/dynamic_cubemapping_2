@@ -6,7 +6,7 @@
 #define ENV_GLASS 2
 
 // Effects
-#define FX_REGULAR 0
+#define FX_REGULAR 0    
 #define FX_BK 1
 #define FX_SEPAI 2
 #define FX_INVERT 3
@@ -171,14 +171,15 @@ void main() {
 
     vec3 R, R1, R2;
     vec3 color;
+    float ref = 1.1;
 
     if(envType == ENV_REFLECT) {
         R = reflect(I, n);
     } else if(envType == ENV_REFRACT) {
-        R = refract(I, n, 1.1);
+        R = refract(I, n, ref);
     } else if(envType == ENV_GLASS) {
         R1 = reflect(I, n);
-        R2 = refract(I, n, 1.1);
+        R2 = refract(I, n, ref);
     }
 
     // Section for pixelate
@@ -245,7 +246,7 @@ void main() {
     vec4 trans = transCalc(v_FragPosLightSpace);
 
     if(trans.a > 0.0) {
-        finalColor = (a + (1.0 - shadow) * (d)) * color + s + trans.rgb * trans.a * color * d + trans.rgb * pow(trans.a, 16.0) * color;
+        finalColor = (a + (1.0 - shadow) * (d) * (trans.rgb * trans.a)) * color + s;
     } else {
         finalColor = (a + (1.0 - shadow) * (d)) * color + s;
     }

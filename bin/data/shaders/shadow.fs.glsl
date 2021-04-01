@@ -32,7 +32,7 @@ void main() {
         float ndotl = max(dot(n, l), 0.0);
         float ndotl2 = max(dot(n, l), 0.0);
 
-        out_Color = vec4(vec3(1.0), mix(ndotl, ndotl2, 0.5));
+        out_Color = vec4(vec3(1.0), ndotl);
     } else {
         out_Color = vec4(0.0);
     }
