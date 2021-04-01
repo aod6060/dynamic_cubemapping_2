@@ -15,6 +15,8 @@
 #define FX_PIXELATED 5
 #define FX_SIZE 6
 
+// Caustic
+// URL: https://en.wikipedia.org/wiki/Caustic_(optics)
 struct Matrices {
 	glm::mat4 proj;
 	glm::mat4 view;
@@ -351,6 +353,13 @@ bool isNormalMapped = false;
 int envType = ENV_REFLECT;
 int fxType = FX_REGULAR;
 
+ui::UIContainer container;
+ui::Label test;
+ui::Button testButton;
+ui::CheckBox testCheckBox;
+ui::SelectButton testSelectButton;
+ui::Slider testSlider;
+
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
 	TextureMaterial& tex, 
@@ -581,57 +590,153 @@ void demo_init(ft::Table* table) {
 	dynamicCubemapFB.drawBuffers(GL_COLOR_ATTACHMENT0);
 
 	dynamicCubemapFB.unbind();
+
+	// Label
+	test.setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	test.setPosition(glm::vec2(32.0f, 32.0f));
+	test.setText("This is a test :)");
+
+	// Button
+	testButton.setColor(glm::vec4(1.0f));
+	testButton.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0));
+	testButton.setActiveColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
+	testButton.setPosition(glm::vec2(32.0f, 64.0f));
+	testButton.setText("Test Button");
+
+	testButton.setAction([&](ui::IAction* action) {
+		test.setText("I pressed a button");
+		std::cout << "I pressed a button" << std::endl;
+	});
+
+	// CheckBox
+	testCheckBox.setColor(glm::vec4(1.0f));
+	testCheckBox.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	testCheckBox.setOffColor(glm::vec4(glm::vec3(0.25f), 1.0f));
+	testCheckBox.setOnColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
+	testCheckBox.setText("Test Checkbox");
+	testCheckBox.setPosition(glm::vec2(32.0f, 96.0f));
+	
+	testCheckBox.setAction([&](ui::IAction* action) {
+		std::stringstream ss;
+
+		std::string str = (((ui::CheckBox*)action)->isChecked()) ? "true" : "false";
+
+		ss << "Test CheckBox Value: " << str;
+
+		test.setText(ss.str());
+
+		std::cout << ss.str() << std::endl;
+	});
+
+	// Select Button
+	testSelectButton.setColor(glm::vec4(1.0f));
+	testSelectButton.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	testSelectButton.add(ui::SelectButton::SelectButtonValue("hello", 0));
+	testSelectButton.add(ui::SelectButton::SelectButtonValue("goodbye", 1));
+	testSelectButton.add(ui::SelectButton::SelectButtonValue("What!", 2));
+	testSelectButton.add(ui::SelectButton::SelectButtonValue("OH NO!!!", 3));
+	testSelectButton.add(ui::SelectButton::SelectButtonValue("DAMNIT!!!", 4));
+	testSelectButton.add(ui::SelectButton::SelectButtonValue("SHIT!!!", 5));
+	testSelectButton.add(ui::SelectButton::SelectButtonValue("NO!!!", 6));
+	testSelectButton.setPosition(glm::vec2(32.0f, 128.0f));
+	
+	testSelectButton.setAction([&](ui::IAction* action) {
+
+		std::stringstream ss;
+
+		ss << "Test Select Button: " << testSelectButton.getCurrentValue()->value << ": " << testSelectButton.getCurrentValue()->name;
+
+		test.setText(ss.str());
+
+	});
+
+	// Slider
+	testSlider.setColor(glm::vec4(1.0f));
+	testSlider.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	testSlider.setNobColor(glm::vec4(glm::vec3(0.75f), 1.0f));
+	testSlider.setPositions(glm::vec2(32.0f, 160.0f));
+	testSlider.setMinRange(0.0f);
+	testSlider.setMaxRange(1024.0f);
+	testSlider.setAction([&](ui::IAction* action) {
+		std::stringstream ss;
+
+		ss << "Test Slider: " << testSlider.getValue();
+
+		test.setText(ss.str());
+	});
+
+
+	container.add(&test);
+	container.add(&testButton);
+	container.add(&testCheckBox);
+	container.add(&testSelectButton);
+	container.add(&testSlider);
+
+	container.init();
+
+	container.setActive(true);
+	container.setColor(glm::vec4(0.25, 0.25, 0.25, 0.5));
+	container.setPosition(glm::vec2(0.0, 0.0));
+	container.setSize(glm::vec2(ftw::get()->app.getWidth(), ftw::get()->app.getHeight()));
+
+
 }
 
 void demo_event(SDL_Event& e) {
-
+	container.doEvent(e);
 }
 
 void demo_update(float delta) {
 
 	if (ftw::get()->input.isInputMapPressOnce("toggle-grab")) {
 		ftw::get()->input.toggleGrab();
+
+		container.setActive(!container.isActive());
 	}
 
-	if (ftw::get()->input.isInputMapPressOnce("toggle-depth")) {
-		isDepthShown = !isDepthShown;
-	}
+	if (!container.isActive()) {
+		if (ftw::get()->input.isInputMapPressOnce("toggle-depth")) {
+			isDepthShown = !isDepthShown;
+		}
 
-	if (ftw::get()->input.isInputMapPressOnce("next-mesh")) {
+		if (ftw::get()->input.isInputMapPressOnce("next-mesh")) {
 
-		mIndex += 1;
+			mIndex += 1;
 
-		if (mIndex >= meshes.size()) {
-			mIndex = 0;
+			if (mIndex >= meshes.size()) {
+				mIndex = 0;
+			}
+		}
+
+		if (ftw::get()->input.isInputMapPressOnce("toggle-normalMap")) {
+			isNormalMapped = !isNormalMapped;
+		}
+
+		if (ftw::get()->input.isInputMapPressOnce("next-env-type")) {
+			envType += 1;
+
+			if (envType >= ENV_SIZE) {
+				envType = 0;
+			}
+		}
+
+		if (ftw::get()->input.isInputMapPressOnce("next-fx-type")) {
+			fxType += 1;
+			if (fxType >= FX_SIZE) {
+				fxType = 0;
+			}
+		}
+
+		camera.update(delta);
+
+		yrot += 32.0f * delta;
+
+		if (yrot > 360.0f) {
+			yrot -= 360.0f;
 		}
 	}
-
-	if (ftw::get()->input.isInputMapPressOnce("toggle-normalMap")) {
-		isNormalMapped = !isNormalMapped;
-	}
-
-	if (ftw::get()->input.isInputMapPressOnce("next-env-type")) {
-		envType += 1;
-
-		if (envType >= ENV_SIZE) {
-			envType = 0;
-		}
-	}
-
-	if (ftw::get()->input.isInputMapPressOnce("next-fx-type")) {
-		fxType += 1;
-		if (fxType >= FX_SIZE) {
-			fxType = 0;
-		}
-	}
-
-	camera.update(delta);
-		
-	yrot += 32.0f * delta;
-
-	if (yrot > 360.0f) {
-		yrot -= 360.0f;
-	}
+	
+	container.update(delta);
 }
 
 void demo_render_scene() {
@@ -942,9 +1047,13 @@ void demo_render() {
 	demo_render_scene();
 
 	render_hub();
+
+
+	container.render();
 }
 
 void demo_release() {
+	container.release();
 
 	dynamicCubemapFB.release();
 	dynamicCubemapDepth.release();

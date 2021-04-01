@@ -388,6 +388,11 @@ namespace ui {
 		virtual void update(float delta) = 0;
 		virtual void render() = 0;
 		virtual void release() = 0;
+
+		virtual glm::vec2 getPosition() = 0;
+		virtual glm::vec2 getSize() = 0;
+		virtual glm::vec4 getColor() = 0;
+
 	};
 
 	struct IContainer {
@@ -400,6 +405,292 @@ namespace ui {
 		virtual void setAction(std::function<void(IAction*)> actionCB) = 0;
 	};
 
+	struct Rect {
+		glm::vec2 position;
+		glm::vec2 size;
+
+		void init(glm::vec2 position, glm::vec2 size);
+		float left();
+		float right();
+		float top();
+		float bottom();
+
+		bool isCollision(Rect& r);
+		bool isCollision(glm::vec2& v);
+
+	};
+	// Label
+	struct Label : public IComponent {
+		glm::vec2 position;
+		glm::vec2 size;
+		std::string text;
+		glm::vec4 color;
+
+		virtual void init();
+		virtual void doEvent(SDL_Event& e);
+		virtual void update(float delta);
+		virtual void render();
+		virtual void release();
+
+		virtual glm::vec2 getPosition();
+		void setPosition(glm::vec2 pos);
+
+		virtual glm::vec2 getSize();
+		void setSize(glm::vec2 size);
+
+		void setText(std::string text);
+		std::string getText();
+
+		virtual glm::vec4 getColor();
+		void setColor(glm::vec4 color);
+	};
+
+	// Button
+	struct Button : public IComponent, public IAction {
+		glm::vec2 position;
+		glm::vec2 size;
+		glm::vec4 color;
+		glm::vec4 backgroundColor;
+		glm::vec4 activeColor;
+		std::function<void(IAction*)> actionCB;
+		std::string text;
+
+		bool isActivated = false;
+		float time = 0.0f;
+		float maxTime = 0.25f;
+
+		virtual void init();
+		virtual void doEvent(SDL_Event& e);
+		virtual void update(float delta);
+		virtual void render();
+		virtual void release();
+
+		virtual glm::vec2 getPosition();
+		void setPosition(glm::vec2 pos);
+		
+		virtual glm::vec2 getSize();
+		void setSize(glm::vec2 size);
+		
+		virtual glm::vec4 getColor();
+		void setColor(glm::vec4 color);
+
+		glm::vec4 getBackgroundColor();
+		void setBackgroundColor(glm::vec4 bg);
+
+		glm::vec4 getActiveColor();
+		void setActiveColor(glm::vec4 ac);
+
+		virtual void setAction(std::function<void(IAction*)> actionCB);
+
+		void setText(std::string text);
+		std::string getText();
 
 
+	};
+
+	// Check Button
+	struct CheckBox : public IComponent, public IAction {
+		glm::vec2 position;
+		glm::vec2 size;
+		glm::vec4 color;
+
+		glm::vec4 offColor;
+		glm::vec4 onColor;
+
+		glm::vec4 backgroundColor;
+
+		std::function<void(IAction*)> actionCB;
+		std::string text;
+
+		bool checked = false;
+
+		virtual void init();
+		virtual void doEvent(SDL_Event& e);
+		virtual void update(float delta);
+		virtual void render();
+		virtual void release();
+
+		virtual glm::vec2 getPosition();
+		void setPosition(glm::vec2 pos);
+
+		virtual glm::vec2 getSize();
+		void setSize(glm::vec2 size);
+
+		virtual glm::vec4 getColor();
+		void setColor(glm::vec4 color);
+
+		virtual void setAction(std::function<void(IAction*)> actionCB);
+
+		void setText(std::string text);
+		std::string getText();
+
+		bool isChecked();
+		void setChecked(bool checked);
+
+		glm::vec4 getOffColor();
+		void setOffColor(glm::vec4 color);
+
+		glm::vec4 getOnColor();
+		void setOnColor(glm::vec4 color);
+
+		glm::vec4 getBackgroundColor();
+		void setBackgroundColor(glm::vec4 color);
+	};
+
+	// Select Button
+	struct SelectButton : public IComponent, public IAction {
+
+		struct SelectButtonValue {
+			std::string name;
+			uint32_t value;
+
+			SelectButtonValue() {}
+
+			SelectButtonValue(std::string name, uint32_t value) {
+				this->name = name;
+				this->value = value;
+			}
+		};
+
+		glm::vec2 position;
+		glm::vec2 size;
+		glm::vec4 color;
+
+		glm::vec4 backgroundColor;
+
+		std::function<void(IAction*)> actionCB;
+
+		std::vector<SelectButtonValue> values;
+
+		int32_t currentValue = 0;
+
+		virtual void init();
+
+		virtual void doEvent(SDL_Event& e);
+
+		virtual void update(float delta);
+
+		virtual void render();
+
+		virtual void release();
+
+		virtual glm::vec2 getPosition();
+
+		void setPosition(glm::vec2 position);
+
+		virtual glm::vec2 getSize();
+
+		void setSize(glm::vec2 size);
+
+		virtual glm::vec4 getColor();
+
+		void setColor(glm::vec4 color);
+
+		virtual void setAction(std::function<void(IAction*)> actionCB);
+
+		SelectButtonValue* getCurrentValue();
+
+		void setBackgroundColor(glm::vec4 c);
+
+		glm::vec4 getBackgroundColor();
+
+		void add(const SelectButtonValue& value);
+		void clear();
+
+	};
+
+	// Slider
+	struct Slider : public IComponent, public IAction {
+		glm::vec2 position;
+		glm::vec2 size;
+		glm::vec4 color;
+
+		glm::vec4 backgroundColor;
+		glm::vec4 nobColor;
+
+		float value = 0.0f;
+
+		float minValue = 0.0f;
+		float maxValue = 1.0f;
+
+		bool isMoving = false;
+
+		float nobX = 0;
+
+		float minRange = 0.0f;
+		float maxRange = 1.0f;
+
+		std::function<void(IAction*)> actionCB;
+
+		virtual void init();
+
+		virtual void doEvent(SDL_Event& e);
+
+		virtual void update(float delta);
+
+		virtual void render();
+
+		virtual void release();
+
+		virtual glm::vec2 getPosition();
+
+		void setPositions(glm::vec2 size);
+
+		virtual glm::vec2 getSize();
+
+		void setSize(glm::vec2 size);
+
+		virtual glm::vec4 getColor();
+
+		void setColor(glm::vec4 color);
+
+		virtual void setAction(std::function<void(IAction*)> actionCB);
+
+		glm::vec4 getBackgroundColor();
+
+		void setBackgroundColor(glm::vec4 bgColor);
+
+		glm::vec4 getNobColor();
+
+		void setNobColor(glm::vec4 nobColor);
+
+		float getValue();
+
+		void setMinRange(float minRange);
+
+		void setMaxRange(float maxRange);
+
+	};
+
+	// UI Container
+	struct UIContainer : public IComponent, public IContainer {
+		glm::vec2 position;
+		glm::vec2 size;
+		glm::vec4 color;
+
+		bool active = false;
+
+		std::vector<IComponent*> comps;
+
+		virtual void init();
+		virtual void doEvent(SDL_Event& e);
+		virtual void update(float delta);
+		virtual void render();
+		virtual void release();
+
+		virtual glm::vec2 getPosition();
+		void setPosition(glm::vec2 position);
+		virtual glm::vec2 getSize();
+		void setSize(glm::vec2 size);
+		virtual glm::vec4 getColor();
+		void setColor(glm::vec4 color);
+
+		virtual void add(IComponent* comp);
+		virtual void remove(IComponent* comp);
+		virtual uint32_t count();
+
+		bool isActive();
+		void setActive(bool active);
+
+	};
 }
