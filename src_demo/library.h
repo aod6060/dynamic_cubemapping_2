@@ -377,6 +377,8 @@ namespace transform {
 		glm::vec3 getPosition();
 
 		glm::vec3 l(glm::vec3 min, glm::vec3 max, float t);
+
+		void reset();
 	};
 }
 
@@ -445,6 +447,7 @@ namespace ui {
 		bool isCollision(glm::vec2& v);
 
 	};
+
 	// Label
 	struct Label : public IComponent {
 		glm::vec2 position;
@@ -621,6 +624,7 @@ namespace ui {
 		glm::vec4 getBackgroundColor();
 
 		void add(const SelectButtonValue& value);
+
 		void clear();
 
 	};
@@ -699,23 +703,35 @@ namespace ui {
 		std::vector<IComponent*> comps;
 
 		virtual void init();
+
 		virtual void doEvent(SDL_Event& e);
+
 		virtual void update(float delta);
+
 		virtual void render();
+
 		virtual void release();
 
 		virtual glm::vec2 getPosition();
+
 		void setPosition(glm::vec2 position);
+
 		virtual glm::vec2 getSize();
+
 		void setSize(glm::vec2 size);
+
 		virtual glm::vec4 getColor();
+
 		void setColor(glm::vec4 color);
 
 		virtual void add(IComponent* comp);
+
 		virtual void remove(IComponent* comp);
+
 		virtual uint32_t count();
 
 		bool isActive();
+
 		void setActive(bool active);
 
 	};

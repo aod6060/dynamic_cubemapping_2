@@ -139,4 +139,9 @@ namespace transform {
 	glm::vec3 Path::l(glm::vec3 min, glm::vec3 max, float t) {
 		return (max - min) * t + min;
 	}
+
+	void Path::reset() {
+		this->index = 0;
+		this->time = 0.0f;
+	}
 }

@@ -245,11 +245,15 @@ void main() {
 
     vec4 trans = transCalc(v_FragPosLightSpace);
 
+    /*
     if(trans.a > 0.0) {
         finalColor = (a + (1.0 - shadow) * (d) * (trans.rgb * trans.a)) * color + s;
     } else {
         finalColor = (a + (1.0 - shadow) * (d)) * color + s;
     }
-    
+    */
+
+    finalColor = (a + (1.0 - mix(shadow, 1.0 - trans.a, 0.45)) * (d)) * color + s;
+
     out_Color = vec4(finalColor, 1.0);
 }

@@ -334,7 +334,7 @@ static uint32_t currentSkybox = 0;
 
 static float yrot = 0.0f;
 
-static const uint32_t SHADOW_SIZE = 1024;
+static const uint32_t SHADOW_SIZE = 1024 * 2;
 
 static rend::Texture2D depthMapTex;
 static rend::Texture2D transparentMap;
@@ -354,11 +354,13 @@ static rend::Cubemap dynamicCubemap;
 static rend::Renderbuffer dynamicCubemapDepth;
 static rend::Framebuffer dynamicCubemapFB;
 
+static transform::Path objPath;
 
 static bool isNormalMapped = false;
 static int envType = ENV_REFLECT;
 static int fxType = FX_REGULAR;
 static bool canUpdate = false;
+static bool usingPath = false;
 
 static ui::UIContainer container;
 
@@ -370,6 +372,7 @@ static ui::SelectButton selectEnvTypeSB;
 static ui::SelectButton selectFXTypeSB;
 static ui::CheckBox canUpdateCB;
 static ui::SelectButton selectSkyboxSB;
+static ui::CheckBox usingPathCB;
 
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
@@ -621,6 +624,17 @@ void demo_init(ft::Table* table) {
 
 	dynamicCubemapFB.unbind();
 
+	// Create Path
+	objPath.add(transform::Path::PathData(glm::vec3(-10.0f, 2.0f, 10.0f)));
+	objPath.add(transform::Path::PathData(glm::vec3(-10.0f, 2.0f, -10.0f)));
+	objPath.add(transform::Path::PathData(glm::vec3(10.0f, 2.0f, -10.0f)));
+	objPath.add(transform::Path::PathData(glm::vec3(10.0f, 2.0f, 10.0f)));
+
+	objPath.add(transform::Path::PathData(glm::vec3(-10.0f, 4.0f, 10.0f)));
+	objPath.add(transform::Path::PathData(glm::vec3(-10.0f, 4.0f, -10.0f)));
+	objPath.add(transform::Path::PathData(glm::vec3(10.0f, 4.0f, -10.0f)));
+	objPath.add(transform::Path::PathData(glm::vec3(10.0f, 4.0f, 10.0f)));
+
 	// Show Depth CB
 	showDepthCB.setColor(glm::vec4(1.0f));
 	showDepthCB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
@@ -748,6 +762,21 @@ void demo_init(ft::Table* table) {
 		currentSkybox = selectSkyboxSB.getCurrentValue()->value;
 	});
 
+	// Using Path
+	usingPathCB.setColor(glm::vec4(1.0f));
+	usingPathCB.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	usingPathCB.setOffColor(glm::vec4(glm::vec3(0.25f), 1.0f));
+	usingPathCB.setOnColor(glm::vec4(0.5f, 0.0f, 0.0f, 1.0f));
+	usingPathCB.setText("Using Path");
+	usingPathCB.setPosition(glm::vec2(32.0f, 288.0f));
+	usingPathCB.setAction([&](ui::IAction* action) {
+		usingPath = usingPathCB.isChecked();
+
+		if (usingPath) {
+			objPath.reset();
+		}
+	});
+
 	container.add(&showDepthCB);
 	container.add(&showCasticMapCB);
 	container.add(&selectMeshSB);
@@ -756,6 +785,7 @@ void demo_init(ft::Table* table) {
 	container.add(&selectFXTypeSB);
 	container.add(&canUpdateCB);
 	container.add(&selectSkyboxSB);
+	container.add(&usingPathCB);
 
 	container.init();
 
@@ -787,6 +817,10 @@ void demo_update(float delta) {
 
 		if (yrot > 360.0f) {
 			yrot -= 360.0f;
+		}
+
+		if (usingPath) {
+			objPath.update(delta);
 		}
 	}
 
@@ -833,10 +867,20 @@ void demo_render_scene() {
 	dynamicCubemap.bind(GL_TEXTURE0);
 	dirtTM.normal.bind(GL_TEXTURE1);
 
-	glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f));
+	glm::vec3 p = glm::vec3(0.0f, 2.0f, 0.0f);
+
+	glm::mat4 model;
+
+	if (usingPath) {
+		p = objPath.getPosition();
+
+		model = glm::translate(glm::mat4(1.0f), p) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f));
+	}
+	else {
+		model = glm::translate(glm::mat4(1.0f), p) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f));
+	}
 
 	reflectiveProgram.uniformMat4("model", model);
-
 	glm::mat4 normalMatrix = glm::transpose(glm::inverse(model));
 
 	reflectiveProgram.uniformMat4("normalMatrix", normalMatrix);
@@ -872,9 +916,9 @@ void demo_render_scene() {
 
 void demo_render_shadow() {
 
-	float size = 10.0f;
+	float size = 16.0f;
 	float near_plane = 1.0f;
-	float far_plane = 32.0f;
+	float far_plane = 64.0f;
 
 	//glEnable(GL_CULL_FACE);
 
@@ -909,7 +953,12 @@ void demo_render_shadow() {
 
 	shadowProg.uniform1("isNormalMapped", isNormalMapped);
 	dirtTM.normal.bind(GL_TEXTURE0);
-	drawShadowMesh(*meshes[mIndex], (envType == ENV_REFRACT || envType == ENV_GLASS) ? true : false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	if (usingPath) {
+		drawShadowMesh(*meshes[mIndex], (envType == ENV_REFRACT || envType == ENV_GLASS) ? true : false, glm::translate(glm::mat4(1.0f), objPath.getPosition()) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	}
+	else {
+		drawShadowMesh(*meshes[mIndex], (envType == ENV_REFRACT || envType == ENV_GLASS) ? true : false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	}
 	dirtTM.normal.unbind(GL_TEXTURE0);
 
 	shadowProg.unbind();
@@ -982,7 +1031,13 @@ void demo_render_cubemap() {
 		m.proj = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 1024.0f);
 		
 		glm::mat4 view;
-		toView(i, view, glm::vec3(0.0f, 2.0f, 0.0f));
+
+		if (usingPath) {
+			toView(i, view, objPath.getPosition());
+		}
+		else {
+			toView(i, view, glm::vec3(0.0f, 2.0f, 0.0f));
+		}
 
 		m.view = view;
 		m.lightSpaceMatrix = matrices.lightSpaceMatrix;
@@ -1091,7 +1146,7 @@ void render_hub() {
 	hubProgram.unbind();
 
 	glEnable(GL_DEPTH_TEST);
-}
+}	
 
 void demo_render() {
 
