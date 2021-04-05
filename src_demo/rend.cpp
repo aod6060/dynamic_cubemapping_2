@@ -13,7 +13,6 @@ namespace rend {
 
 		util::readFile(vsPath, [&](std::string line) {
 			ss << line << std::endl;
-			std::cout << line << std::endl;
 		});
 
 		std::string src = ss.str();
@@ -38,7 +37,7 @@ namespace rend {
 		ss.str("");
 		util::readFile(fsPath, [&](std::string line) {
 			ss << line << std::endl;
-			std::cout << line << std::endl;
+			//std::cout << line << std::endl;
 		});
 
 		src = ss.str();

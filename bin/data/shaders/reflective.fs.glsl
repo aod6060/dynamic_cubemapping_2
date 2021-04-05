@@ -38,7 +38,7 @@ in mat3 v_TBN;
 in vec2 v_TexCoords;
 
 uniform sampler2D shadowMap;
-uniform sampler2D transMap;
+//uniform sampler2D transMap;
 
 uniform samplerCube refTex;
 uniform sampler2D normalMap;
@@ -81,6 +81,7 @@ float ShadowCalc(vec4 p) {
     return shadow;
 }
 
+/*
 vec4 transCalc(vec4 p) {
     vec3 projCoords = p.xyz / p.w;
 
@@ -90,6 +91,7 @@ vec4 transCalc(vec4 p) {
 
     return trans;
 }
+*/
 
 vec3 hurBlur(samplerCube s, vec3 tc, float blurSize) {
     vec3 sum = vec3(0.0);
@@ -243,7 +245,7 @@ void main() {
 
     vec3 finalColor;
 
-    vec4 trans = transCalc(v_FragPosLightSpace);
+    //vec4 trans = transCalc(v_FragPosLightSpace);
 
     /*
     if(trans.a > 0.0) {
@@ -253,7 +255,8 @@ void main() {
     }
     */
 
-    finalColor = (a + (1.0 - mix(shadow, 1.0 - trans.a, 0.45)) * (d)) * color + s;
-
+    //finalColor = (a + (1.0 - mix(shadow, 1.0 - trans.a, 0.45)) * (d)) * color + s;
+    finalColor = (a + (1.0 - shadow) * (d)) * color + s;
+    
     out_Color = vec4(finalColor, 1.0);
 }

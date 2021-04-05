@@ -66,8 +66,10 @@ struct MainProgram : public rend::Program {
 		this->createUniform("shadowDepthMap");
 		this->uniform1("shadowDepthMap", 3);
 
+		/*
 		this->createUniform("transMap");
 		this->uniform1("transMap", 4);
+		*/
 
 		// Uniforms Buffer Object
 		this->createUniformBlock("Matrices", 0);
@@ -132,27 +134,27 @@ struct ShadowProgram : public rend::Program {
 		this->createUniform("proj");
 		this->createUniform("view");
 		this->createUniform("model");
+		/*
 		this->createUniform("normalMatrix");
 		this->createUniform("lightDir");
 		this->createUniform("isTrans");
 		this->createUniform("normalMap");
 		this->uniform1("normalMap", 0);
 		this->createUniform("isNormalMapped");
-
+		*/
 		// Attribute
 		this->createAttributes("vertices", 0);
-		this->createAttributes("normals", 1);
-		this->createAttributes("tangents", 2);
-		this->createAttributes("biTangents", 3);
-		this->createAttributes("texCoords", 4);
+		//this->createAttributes("normals", 1);
+		//this->createAttributes("tangents", 2);
+		//this->createAttributes("biTangents", 3);
+		//this->createAttributes("texCoords", 4);
 
 		this->bindAttributes();
 		this->enable("vertices");
-		this->enable("normals");
-		this->enable("tangents");
-		this->enable("biTangents");
-		this->enable("texCoords");
-
+		//this->enable("normals");
+		//this->enable("tangents");
+		//this->enable("biTangents");
+		//this->enable("texCoords");
 		this->unbindAttribute();
 	}
 };
@@ -200,8 +202,10 @@ struct ReflectiveProgram : public rend::Program {
 		this->createUniform("shadowMap");
 		this->uniform1("shadowMap", 3);
 
+		/*
 		this->createUniform("transMap");
 		this->uniform1("transMap", 4);
+		*/
 
 		this->createUniform("refTex");
 		this->uniform1("refTex", 0);
@@ -337,7 +341,7 @@ static float yrot = 0.0f;
 static const uint32_t SHADOW_SIZE = 1024 * 2;
 
 static rend::Texture2D depthMapTex;
-static rend::Texture2D transparentMap;
+//static rend::Texture2D transparentMap;
 static rend::Framebuffer depthMapFBO;
 
 // HUB Buffers
@@ -381,7 +385,6 @@ void drawMesh(
 
 void drawShadowMesh(
 	mesh::OpenGLMesh& mesh,
-	bool isTrans,
 	const glm::mat4& model);
 
 void drawSkybox(
@@ -540,6 +543,7 @@ void demo_init(ft::Table* table) {
 
 	depthMapTex.unbind(GL_TEXTURE0);
 
+	/*
 	transparentMap.init();
 	transparentMap.bind(GL_TEXTURE0);
 	transparentMap.update(SHADOW_SIZE, SHADOW_SIZE, GL_RGBA, GL_FLOAT);
@@ -550,15 +554,16 @@ void demo_init(ft::Table* table) {
 	transparentMap.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
 
 	transparentMap.unbind(GL_TEXTURE0);
+	*/
 
 	depthMapFBO.init();
 	depthMapFBO.bind();
 
 	depthMapFBO.attachDepthBuffer(depthMapTex);
-	depthMapFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, transparentMap);
+	//depthMapFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, transparentMap);
 
-	depthMapFBO.drawBuffers(GL_COLOR_ATTACHMENT0);
-	depthMapFBO.readBuffer(GL_COLOR_ATTACHMENT0);
+	depthMapFBO.drawBuffers(GL_NONE);
+	depthMapFBO.readBuffer(GL_NONE);
 	depthMapFBO.unbind();
 
 
@@ -841,7 +846,7 @@ void demo_render_scene() {
 	skyboxProg.unbind();
 
 	depthMapTex.bind(GL_TEXTURE3);
-	transparentMap.bind(GL_TEXTURE4);
+	//transparentMap.bind(GL_TEXTURE4);
 
 	mainProg.bind();
 
@@ -910,7 +915,7 @@ void demo_render_scene() {
 
 	dirtTM.normal.bind(GL_TEXTURE1);
 	dynamicCubemap.unbind(GL_TEXTURE0);
-	transparentMap.unbind(GL_TEXTURE4);
+	//transparentMap.unbind(GL_TEXTURE4);
 	depthMapTex.unbind(GL_TEXTURE3);
 }
 
@@ -941,32 +946,44 @@ void demo_render_shadow() {
 	shadowProg.uniformMat4("proj", proj);
 	shadowProg.uniformMat4("view", view);
 
-	shadowProg.uniform3("lightDir", light.direction.x, light.direction.y, light.direction.z);
+	//shadowProg.uniform3("lightDir", light.direction.x, light.direction.y, light.direction.z);
 
-	shadowProg.uniform1("isNormalMapped", false);
-	drawShadowMesh(floorMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
-	drawShadowMesh(cubeMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(cylenderMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(monkeyFaceMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(sphereMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	drawShadowMesh(torusMesh, false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	//shadowProg.uniform1("isNormalMapped", false);
+	drawShadowMesh(floorMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
+	drawShadowMesh(cubeMesh, glm::translate(glm::mat4(1.0f), glm::vec3(7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(cylenderMesh, glm::translate(glm::mat4(1.0f), glm::vec3(-7.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(monkeyFaceMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(sphereMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, -7.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+	drawShadowMesh(torusMesh, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 9.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
 
-	shadowProg.uniform1("isNormalMapped", isNormalMapped);
-	dirtTM.normal.bind(GL_TEXTURE0);
+
+	//shadowProg.uniform1("isNormalMapped", isNormalMapped);
+	
+	//dirtTM.normal.bind(GL_TEXTURE0);
 	if (usingPath) {
-		drawShadowMesh(*meshes[mIndex], (envType == ENV_REFRACT || envType == ENV_GLASS) ? true : false, glm::translate(glm::mat4(1.0f), objPath.getPosition()) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		drawShadowMesh(
+			*meshes[mIndex],
+			glm::translate(glm::mat4(1.0f), objPath.getPosition()) * 
+			glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
 	}
 	else {
-		drawShadowMesh(*meshes[mIndex], (envType == ENV_REFRACT || envType == ENV_GLASS) ? true : false, glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		drawShadowMesh(
+			*meshes[mIndex], 
+			glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * 
+			glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
 	}
-	dirtTM.normal.unbind(GL_TEXTURE0);
-
+	//dirtTM.normal.unbind(GL_TEXTURE0);
+	
 	shadowProg.unbind();
 	
 	depthMapFBO.unbind();
 	//glCullFace(GL_BACK);
 
 	//glDisable(GL_CULL_FACE);
+}
+
+void demo_render_castic() {
+
 }
 
 void demo_render_cubemap() {
@@ -1061,7 +1078,7 @@ void demo_render_cubemap() {
 		skyboxProg.unbind();
 
 		depthMapTex.bind(GL_TEXTURE3);
-		transparentMap.bind(GL_TEXTURE4);
+		//transparentMap.bind(GL_TEXTURE4);
 
 		mainProg.bind();
 
@@ -1078,7 +1095,7 @@ void demo_render_cubemap() {
 
 		mainProg.unbind();
 
-		transparentMap.unbind(GL_TEXTURE4);
+		//transparentMap.unbind(GL_TEXTURE4);
 		depthMapTex.unbind(GL_TEXTURE3);
 
 		dynamicCubemapFB.unbind();
@@ -1128,7 +1145,8 @@ void render_hub() {
 	if (isCasticMapShown) {
 		hubProgram.uniformMat4("model", model);
 
-		transparentMap.bind(GL_TEXTURE0);
+		//transparentMap.bind(GL_TEXTURE0);
+		depthMapTex.bind(GL_TEXTURE0);
 		hubProgram.bindAttributes();
 
 		hubVertices.bind();
@@ -1140,7 +1158,8 @@ void render_hub() {
 		glDrawArrays(GL_TRIANGLES, 0, hubVertices.count());
 
 		hubProgram.unbindAttribute();
-		transparentMap.unbind(GL_TEXTURE0);
+		depthMapTex.unbind(GL_TEXTURE0);
+		//transparentMap.unbind(GL_TEXTURE0);
 	}
 
 	hubProgram.unbind();
@@ -1161,6 +1180,7 @@ void demo_render() {
 
 	demo_render_shadow();
 
+	demo_render_castic();
 
 	demo_render_cubemap();
 
@@ -1194,7 +1214,7 @@ void demo_release() {
 	hubVertices.release();
 
 	depthMapFBO.release();
-	transparentMap.release();
+	//transparentMap.release();
 	depthMapTex.release();
 
 	// Skybox
@@ -1275,18 +1295,25 @@ void drawMesh(
 	tex.unbind();
 }
 
-void drawShadowMesh(mesh::OpenGLMesh& mesh, bool isTrans, const glm::mat4& model) {
+void drawShadowMesh(
+	mesh::OpenGLMesh& mesh, 
+	const glm::mat4& model) {
 	shadowProg.uniformMat4("model", model);
 	
+	/*
 	glm::mat4 normalMatrix = glm::transpose(glm::inverse(model));
 
 	shadowProg.uniformMat4("normalMatrix", normalMatrix);
 	shadowProg.uniform1("isTrans", isTrans);
 
 	shadowProg.bindAttributes();
+	*/
+
+	shadowProg.bindAttributes();
 
 	mesh.vertices.bind();
 	shadowProg.ptr("vertices", 3, GL_FLOAT);
+	/*
 	mesh.normals.bind();
 	shadowProg.ptr("normals", 3, GL_FLOAT);
 	mesh.tangents.bind();
@@ -1295,6 +1322,7 @@ void drawShadowMesh(mesh::OpenGLMesh& mesh, bool isTrans, const glm::mat4& model
 	shadowProg.ptr("biTangents", 3, GL_FLOAT);
 	mesh.texCoords.bind();
 	shadowProg.ptr("texCoords", 2, GL_FLOAT);
+	*/
 	mesh.vertices.unbind();
 
 	mesh.index.bind();

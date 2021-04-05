@@ -1,6 +1,6 @@
 #version 400
 
-
+/*
 uniform bool isTrans;
 uniform sampler2D normalMap;
 uniform bool isNormalMapped;
@@ -11,9 +11,11 @@ in mat3 v_TBN;
 in vec2 v_TexCoords;
 
 out vec4 out_Color;
+*/
 
 void main() {
     // Does nothing...
+    /*
     if(isTrans) {
         vec3 n;
 
@@ -36,4 +38,5 @@ void main() {
     } else {
         out_Color = vec4(0.0);
     }
+    */
 }
