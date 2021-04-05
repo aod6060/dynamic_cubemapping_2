@@ -239,6 +239,80 @@ struct ReflectiveProgram : public rend::Program {
 	}
 };
 
+struct CasticProgram : public rend::Program {
+	void init() {
+		rend::Program::init(
+			"data/shaders/castic.vs.glsl",
+			"data/shaders/castic.fs.glsl"
+		);
+	}
+
+	virtual void onCreateUniformsAttributes() {
+		// Uniforms
+		this->createUniform("proj");
+		this->createUniform("view");
+		this->createUniform("model");
+		this->createUniform("normalMatrix");
+		this->createUniform("lightDir");
+
+		this->createUniform("normalMap");
+		this->uniform1("normalMap", 0);
+
+		this->createUniform("isNormalMapped");
+		this->createUniform("isBack");
+
+		// Attributes
+		this->createAttributes("vertices", 0);
+		this->createAttributes("texCoords", 1);
+		this->createAttributes("normals", 2);
+		this->createAttributes("tangents", 3);
+		this->createAttributes("biTangents", 4);
+
+		this->bindAttributes();
+		this->enable("vertices");
+		this->enable("texCoords");
+		this->enable("normals");
+		this->enable("tangents");
+		this->enable("biTangents");
+		this->unbindAttribute();
+	}
+
+};
+
+struct CombineProgram : public rend::Program {
+	void init() {
+		rend::Program::init(
+			"data/shaders/preprocess/combine.vs.glsl",
+			"data/shaders/preprocess/combine.fs.glsl"
+		);
+	}
+
+	virtual void onCreateUniformsAttributes() {
+		// Uniforms
+		this->createUniform("proj");
+		this->createUniform("view");
+		this->createUniform("model");
+
+		this->createUniform("tex0");
+		this->uniform1("tex0", 0);
+
+		this->createUniform("tex1");
+		this->uniform1("tex1", 1);
+
+		this->createUniform("value");
+
+		// Attributes
+		this->createAttributes("vertices", 0);
+		this->createAttributes("texCoords", 1);
+
+		this->bindAttributes();
+		this->enable("vertices");
+		this->enable("texCoords");
+		this->unbindAttribute();
+	}
+
+};
+
 static SDL_GLContext context;
 
 static Matrices matrices;
@@ -250,6 +324,8 @@ static SkyboxProgram skyboxProg;
 static ShadowProgram shadowProg;
 static HUBProgram hubProgram;
 static ReflectiveProgram reflectiveProgram;
+static CasticProgram casticProgram;
+static CombineProgram combineProgram;
 
 static rend::UniformBuffer matricesBuffer;
 static rend::UniformBuffer lightBuffer;
@@ -343,6 +419,157 @@ static const uint32_t SHADOW_SIZE = 1024 * 2;
 static rend::Texture2D depthMapTex;
 //static rend::Texture2D transparentMap;
 static rend::Framebuffer depthMapFBO;
+
+// Castics
+struct CasticsWrapper {
+	// Framebuffer
+	rend::Framebuffer casticFBO;
+
+	// Depth Buffer
+	rend::Texture2D depthBuffer;
+	
+	// Front
+	rend::Texture2D frontCasticTex;
+
+	// Back
+	rend::Texture2D backCasticTex;
+
+	// Combine Section
+	rend::Framebuffer combineFBO;
+	rend::Texture2D combineDepthBuffer;
+	rend::Texture2D casticTex;
+	rend::VertexBuffer vertices;
+	rend::VertexBuffer texCoords;
+
+	void init() {
+		casticFBO.init();
+
+		// Create Depth Buffer
+		/*
+		depthMapTex.init();
+		depthMapTex.bind(GL_TEXTURE0);
+
+		depthMapTex.update(SHADOW_SIZE, SHADOW_SIZE, GL_DEPTH_COMPONENT, GL_FLOAT);
+
+		depthMapTex.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		depthMapTex.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		depthMapTex.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		depthMapTex.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+		depthMapTex.unbind(GL_TEXTURE0);
+		*/
+		depthBuffer.init();
+		depthBuffer.bind(GL_TEXTURE0);
+
+		depthBuffer.update(SHADOW_SIZE, SHADOW_SIZE, GL_DEPTH_COMPONENT, GL_FLOAT);
+
+		depthBuffer.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		depthBuffer.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		depthBuffer.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		depthBuffer.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		float borderColor[] = { 1.0f, 1.0f, 1.0f, 1.0f };
+		glTexParameterfv(GL_TEXTURE_2D, GL_TEXTURE_BORDER_COLOR, borderColor);
+
+		depthBuffer.unbind(GL_TEXTURE0);
+		
+		// Create Front Castic Texture
+		/*
+		transparentMap.init();
+		transparentMap.bind(GL_TEXTURE0);
+		transparentMap.update(SHADOW_SIZE, SHADOW_SIZE, GL_RGBA, GL_FLOAT);
+
+		transparentMap.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		transparentMap.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		transparentMap.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		transparentMap.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		transparentMap.unbind(GL_TEXTURE0);
+		*/
+		frontCasticTex.init();
+		frontCasticTex.bind(GL_TEXTURE0);
+		frontCasticTex.update(SHADOW_SIZE, SHADOW_SIZE, GL_RGBA, GL_FLOAT);
+
+		frontCasticTex.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		frontCasticTex.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		frontCasticTex.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		frontCasticTex.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		frontCasticTex.unbind(GL_TEXTURE0);
+		// Create Back Castic Texture
+		backCasticTex.init();
+		backCasticTex.bind(GL_TEXTURE0);
+		backCasticTex.update(SHADOW_SIZE, SHADOW_SIZE, GL_RGBA, GL_FLOAT);
+
+		backCasticTex.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		backCasticTex.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		backCasticTex.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		backCasticTex.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		backCasticTex.unbind(GL_TEXTURE0);
+
+		// Setup Framebuffer
+		casticFBO.bind();
+
+		casticFBO.attachDepthBuffer(depthMapTex);
+		//depthMapFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, transparentMap);
+
+		casticFBO.drawBuffers(GL_COLOR_ATTACHMENT0);
+		casticFBO.readBuffer(GL_COLOR_ATTACHMENT0);
+		casticFBO.unbind();
+
+		// Create CombineFBO
+		combineFBO.init();
+
+		// Combine Depth Buffer
+		combineDepthBuffer.init();
+		combineDepthBuffer.bind(GL_TEXTURE0);
+
+		combineDepthBuffer.update(SHADOW_SIZE, SHADOW_SIZE, GL_DEPTH_COMPONENT, GL_FLOAT);
+
+		combineDepthBuffer.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		combineDepthBuffer.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		combineDepthBuffer.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		combineDepthBuffer.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		combineDepthBuffer.unbind(GL_TEXTURE0);
+
+		// Create Castic Texture
+		casticTex.init();
+		casticTex.bind(GL_TEXTURE0);
+		casticTex.update(SHADOW_SIZE, SHADOW_SIZE, GL_RGBA, GL_FLOAT);
+
+		casticTex.parameteri(GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		casticTex.parameteri(GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		casticTex.parameteri(GL_TEXTURE_WRAP_S, GL_CLAMP_TO_BORDER);
+		casticTex.parameteri(GL_TEXTURE_WRAP_T, GL_CLAMP_TO_BORDER);
+
+		casticTex.unbind(GL_TEXTURE0);
+
+		
+		// Attach Textures to CombineFBO
+		combineFBO.bind();
+
+
+		combineFBO.unbind();
+
+	}
+
+	void release() {
+		texCoords.release();
+		vertices.release();
+		casticTex.release();
+		combineFBO.release();
+		backCasticTex.release();
+		frontCasticTex.release();
+		depthBuffer.release();
+		casticFBO.release();
+	}
+
+} casticsWrapper;
 
 // HUB Buffers
 static rend::VertexBuffer hubVertices;
@@ -566,6 +793,7 @@ void demo_init(ft::Table* table) {
 	depthMapFBO.readBuffer(GL_NONE);
 	depthMapFBO.unbind();
 
+	casticsWrapper.init();
 
 	hubVertices.init();
 	hubVertices.add3(0.0f, 0.0f, 0.0f);
@@ -960,17 +1188,20 @@ void demo_render_shadow() {
 	//shadowProg.uniform1("isNormalMapped", isNormalMapped);
 	
 	//dirtTM.normal.bind(GL_TEXTURE0);
-	if (usingPath) {
-		drawShadowMesh(
-			*meshes[mIndex],
-			glm::translate(glm::mat4(1.0f), objPath.getPosition()) * 
-			glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
-	}
-	else {
-		drawShadowMesh(
-			*meshes[mIndex], 
-			glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) * 
-			glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+
+	if (envType == ENV_REFLECT) {
+		if (usingPath) {
+			drawShadowMesh(
+				*meshes[mIndex],
+				glm::translate(glm::mat4(1.0f), objPath.getPosition()) *
+				glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		}
+		else {
+			drawShadowMesh(
+				*meshes[mIndex],
+				glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) *
+				glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		}
 	}
 	//dirtTM.normal.unbind(GL_TEXTURE0);
 	
@@ -1212,6 +1443,8 @@ void demo_release() {
 
 	hubTexCoords.release();
 	hubVertices.release();
+
+	casticsWrapper.release();
 
 	depthMapFBO.release();
 	//transparentMap.release();
