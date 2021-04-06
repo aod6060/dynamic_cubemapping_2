@@ -48,6 +48,9 @@ uniform bool isNormalMapped;
 uniform int envType;
 uniform int fxType;
 
+uniform vec3 surfaceColor;
+uniform float refValue; // 0.5 ~ 1.1
+
 out vec4 out_Color;
 
 float ShadowCalc(vec4 p) {

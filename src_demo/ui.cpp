@@ -239,11 +239,11 @@ namespace ui {
 	}
 
 	bool Rect::isCollision(glm::vec2& v) {
-return
-this->left() < v.x &&
-	this->right() > v.x &&
-	this->top() < v.y &&
-	this->bottom() > v.y;
+		return
+			this->left() < v.x &&
+			this->right() > v.x &&
+			this->top() < v.y &&
+			this->bottom() > v.y;
 	}
 
 	// Label

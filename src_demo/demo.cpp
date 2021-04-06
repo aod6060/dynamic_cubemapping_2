@@ -40,7 +40,6 @@ struct Material {
 };
 
 struct MainProgram : public rend::Program {
-
 	void init() {
 		//this->init("data/shaders/main.vs.glsl", "data/shaders/main.fs.glsl");
 		rend::Program::init(
@@ -94,11 +93,9 @@ struct MainProgram : public rend::Program {
 		this->enable("biTangents");
 		this->unbindAttribute();
 	}
-
 };
 
 struct SkyboxProgram : public rend::Program {
-	
 	void init() {
 		rend::Program::init(
 			"data/shaders/skybox.vs.glsl",
@@ -124,7 +121,6 @@ struct SkyboxProgram : public rend::Program {
 };
 
 struct ShadowProgram : public rend::Program {
-
 	void init() {
 		rend::Program::init(
 			"data/shaders/shadow.vs.glsl",
@@ -205,11 +201,6 @@ struct ReflectiveProgram : public rend::Program {
 		this->createUniform("shadowMap");
 		this->uniform1("shadowMap", 3);
 
-		/*
-		this->createUniform("transMap");
-		this->uniform1("transMap", 4);
-		*/
-
 		this->createUniform("casticTex");
 		this->uniform1("casticTex", 4);
 
@@ -222,6 +213,8 @@ struct ReflectiveProgram : public rend::Program {
 		this->createUniform("isNormalMapped");
 		this->createUniform("envType");
 		this->createUniform("fxType");
+		this->createUniform("surfaceColor");
+		this->createUniform("refValue");
 
 		// Uniform Buffer Object
 		this->createUniformBlock("Matrices", 0);
@@ -282,7 +275,6 @@ struct CasticProgram : public rend::Program {
 		this->enable("biTangents");
 		this->unbindAttribute();
 	}
-
 };
 
 struct CombineProgram : public rend::Program {
@@ -316,7 +308,6 @@ struct CombineProgram : public rend::Program {
 		this->enable("texCoords");
 		this->unbindAttribute();
 	}
-
 };
 
 static SDL_GLContext context;
@@ -623,6 +614,9 @@ static int fxType = FX_REGULAR;
 static bool canUpdate = false;
 static bool usingPath = false;
 
+static glm::vec3 surfaceColor = glm::vec3(0.0f);
+static float refValue = 0.5f;
+
 static ui::UIContainer container;
 
 static ui::CheckBox showDepthCB;
@@ -634,6 +628,10 @@ static ui::SelectButton selectFXTypeSB;
 static ui::CheckBox canUpdateCB;
 static ui::SelectButton selectSkyboxSB;
 static ui::CheckBox usingPathCB;
+static ui::Label colorSection;
+static ui::Slider redSlider;
+static ui::Slider greenSlider;
+static ui::Slider blueSlider;
 
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
@@ -1047,6 +1045,29 @@ void demo_init(ft::Table* table) {
 		}
 	});
 
+	// static ui::Label colorSection;
+	colorSection.setText("Surface Color");
+	colorSection.setColor(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+	colorSection.setPosition(glm::vec2(32.0f, 320.0f));
+
+	// Red slider
+	redSlider.setColor(glm::vec4(1.0f, 0.0f, 0.0f, 1.0f));
+	redSlider.setBackgroundColor(glm::vec4(0.5f, 0.5, 0.5f, 1.0f));
+	redSlider.setNobColor(glm::vec4(0.75f, 0.0f, 0.0f, 1.0f));
+	redSlider.setPositions(glm::vec2(32.0f, 352.0f));
+
+	// Green slider
+	greenSlider.setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
+	greenSlider.setBackgroundColor(glm::vec4(0.5f, 0.5, 0.5f, 1.0f));
+	greenSlider.setNobColor(glm::vec4(0.0f, 0.75f, 0.0f, 1.0f));
+	greenSlider.setPositions(glm::vec2(32.0f, 384.0f));
+
+	// Blue slider
+	blueSlider.setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
+	blueSlider.setBackgroundColor(glm::vec4(0.5f, 0.5, 0.5f, 1.0f));
+	blueSlider.setNobColor(glm::vec4(0.0f, 0.0f, 0.75f, 1.0f));
+	blueSlider.setPositions(glm::vec2(32.0f, 416.0f));
+
 	container.add(&showDepthCB);
 	container.add(&showCasticMapCB);
 	container.add(&selectMeshSB);
@@ -1056,6 +1077,10 @@ void demo_init(ft::Table* table) {
 	container.add(&canUpdateCB);
 	container.add(&selectSkyboxSB);
 	container.add(&usingPathCB);
+	container.add(&colorSection);
+	container.add(&redSlider);
+	container.add(&greenSlider);
+	container.add(&blueSlider);
 
 	container.init();
 
