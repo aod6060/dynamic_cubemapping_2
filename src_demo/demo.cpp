@@ -66,6 +66,9 @@ struct MainProgram : public rend::Program {
 		this->createUniform("shadowDepthMap");
 		this->uniform1("shadowDepthMap", 3);
 
+		this->createUniform("casticTex");
+		this->uniform1("casticTex", 4);
+
 		/*
 		this->createUniform("transMap");
 		this->uniform1("transMap", 4);
@@ -206,6 +209,9 @@ struct ReflectiveProgram : public rend::Program {
 		this->createUniform("transMap");
 		this->uniform1("transMap", 4);
 		*/
+
+		this->createUniform("casticTex");
+		this->uniform1("casticTex", 4);
 
 		this->createUniform("refTex");
 		this->uniform1("refTex", 0);
@@ -514,11 +520,13 @@ struct CasticsWrapper {
 		// Setup Framebuffer
 		casticFBO.bind();
 
-		casticFBO.attachDepthBuffer(depthMapTex);
+		casticFBO.attachDepthBuffer(depthBuffer);
 		//depthMapFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, transparentMap);
+		casticFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, this->backCasticTex);
 
 		casticFBO.drawBuffers(GL_COLOR_ATTACHMENT0);
 		casticFBO.readBuffer(GL_COLOR_ATTACHMENT0);
+
 		casticFBO.unbind();
 
 		// Create CombineFBO
@@ -553,9 +561,31 @@ struct CasticsWrapper {
 		// Attach Textures to CombineFBO
 		combineFBO.bind();
 
+		combineFBO.attachDepthBuffer(combineDepthBuffer);
+		combineFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, this->casticTex);
+		//depthMapFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, transparentMap);
 
+		combineFBO.drawBuffers(GL_COLOR_ATTACHMENT0);
+		combineFBO.readBuffer(GL_COLOR_ATTACHMENT0);
 		combineFBO.unbind();
 
+		vertices.init();
+		vertices.add3(0.0f, 0.0f, 0.0f);
+		vertices.add3(1.0f, 0.0f, 0.0f);
+		vertices.add3(0.0f, 1.0f, 0.0f);
+		vertices.add3(0.0f, 1.0f, 0.0f);
+		vertices.add3(1.0f, 0.0f, 0.0f);
+		vertices.add3(1.0f, 1.0f, 0.0f);
+		vertices.update();
+
+		texCoords.init();
+		texCoords.add2(0.0f, 0.0f);
+		texCoords.add2(1.0f, 0.0f);
+		texCoords.add2(0.0f, 1.0f);
+		texCoords.add2(0.0f, 1.0f);
+		texCoords.add2(1.0f, 0.0f);
+		texCoords.add2(1.0f, 1.0f);
+		texCoords.update();
 	}
 
 	void release() {
@@ -614,6 +644,11 @@ void drawShadowMesh(
 	mesh::OpenGLMesh& mesh,
 	const glm::mat4& model);
 
+void drawCasticMesh(
+	mesh::OpenGLMesh& mesh,
+	TextureMaterial& tex,
+	const glm::mat4& model);
+
 void drawSkybox(
 	mesh::OpenGLMesh& mesh,
 	rend::Cubemap& cubemap);
@@ -644,6 +679,8 @@ void demo_init(ft::Table* table) {
 	shadowProg.init();
 	hubProgram.init();
 	reflectiveProgram.init();
+	casticProgram.init();
+	combineProgram.init();
 
 	// Uniform Buffer
 	matricesBuffer.init();
@@ -1075,6 +1112,7 @@ void demo_render_scene() {
 
 	depthMapTex.bind(GL_TEXTURE3);
 	//transparentMap.bind(GL_TEXTURE4);
+	casticsWrapper.casticTex.bind(GL_TEXTURE4);
 
 	mainProg.bind();
 
@@ -1141,8 +1179,9 @@ void demo_render_scene() {
 
 	reflectiveProgram.unbind();
 
-	dirtTM.normal.bind(GL_TEXTURE1);
+	dirtTM.normal.unbind(GL_TEXTURE1);
 	dynamicCubemap.unbind(GL_TEXTURE0);
+	casticsWrapper.casticTex.unbind(GL_TEXTURE4);
 	//transparentMap.unbind(GL_TEXTURE4);
 	depthMapTex.unbind(GL_TEXTURE3);
 }
@@ -1214,6 +1253,148 @@ void demo_render_shadow() {
 }
 
 void demo_render_castic() {
+	float size = 16.0f;
+	float near_plane = 1.0f;
+	float far_plane = 64.0f;
+
+	// Render Backface
+
+	casticsWrapper.casticFBO.bind();
+
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_FRONT);
+
+	casticsWrapper.casticFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, casticsWrapper.backCasticTex);
+
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	glm::mat4 proj = glm::ortho(-size, size, -size, size, near_plane, far_plane);
+	//glm::mat4 proj = camera.toProj();
+	glm::mat4 view = glm::lookAt(-light.direction * size, glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+	//glm::mat4 view = camera.toView();
+
+	casticProgram.bind();
+
+	casticProgram.uniformMat4("proj", proj);
+	casticProgram.uniformMat4("view", view);
+
+	casticProgram.uniform3("lightDir", light.direction.x, light.direction.y, light.direction.z);
+
+	casticProgram.uniform1("isNormalMapped", isNormalMapped);
+	
+	casticProgram.uniform1("isBack", false);
+
+	if (envType == ENV_REFRACT || envType == ENV_GLASS) {
+		if (usingPath) {
+			drawCasticMesh(
+				*meshes[mIndex],
+				dirtTM,
+				glm::translate(glm::mat4(1.0f), objPath.getPosition()) *
+				glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		}
+		else {
+			drawCasticMesh(
+				*meshes[mIndex],
+				dirtTM,
+				glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) *
+				glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		}
+	}
+
+
+	casticProgram.unbind();
+
+	glDisable(GL_CULL_FACE);
+	casticsWrapper.casticFBO.unbind();
+
+	// Render Frontface
+
+	casticsWrapper.casticFBO.bind();
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+
+	casticsWrapper.casticFBO.attachColorBuffer(GL_COLOR_ATTACHMENT0, casticsWrapper.frontCasticTex);
+
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+	casticProgram.bind();
+
+	casticProgram.uniform1("isBack", true);
+
+	if (envType == ENV_REFRACT || envType == ENV_GLASS) {
+		if (usingPath) {
+			drawCasticMesh(
+				*meshes[mIndex],
+				dirtTM,
+				glm::translate(glm::mat4(1.0f), objPath.getPosition()) *
+				glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		}
+		else {
+			drawCasticMesh(
+				*meshes[mIndex],
+				dirtTM,
+				glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 2.0f, 0.0f)) *
+				glm::rotate(glm::mat4(1.0f), glm::radians(-yrot), glm::vec3(1.0f, 1.0f, 0.0f)));
+		}
+	}
+
+	casticProgram.unbind();
+
+	glDisable(GL_CULL_FACE);
+	casticsWrapper.casticFBO.unbind();
+
+	// Combine Back and Frontface
+
+	casticsWrapper.combineFBO.bind();
+
+	glDisable(GL_DEPTH_TEST);
+
+	glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+	glViewport(0, 0, SHADOW_SIZE, SHADOW_SIZE);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	combineProgram.bind();
+
+
+	proj = glm::ortho(0.0f, (float)SHADOW_SIZE, 0.0f, (float)SHADOW_SIZE);
+	view = glm::mat4(1.0f);
+	glm::mat4 model = 
+		glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f)) * 
+		glm::scale(glm::mat4(1.0f), glm::vec3((float)SHADOW_SIZE, (float)SHADOW_SIZE, 0.0f));
+
+	combineProgram.uniformMat4("proj", proj);
+	combineProgram.uniformMat4("view", view);
+	combineProgram.uniformMat4("model", model);
+	combineProgram.uniform1("value", 0.85f);
+
+	casticsWrapper.backCasticTex.bind(GL_TEXTURE0);
+	casticsWrapper.frontCasticTex.bind(GL_TEXTURE1);
+
+
+	combineProgram.bindAttributes();
+
+	casticsWrapper.vertices.bind();
+	combineProgram.ptr("vertices", 3, GL_FLOAT);
+	casticsWrapper.texCoords.bind();
+	combineProgram.ptr("texCoords", 2, GL_FLOAT);
+	casticsWrapper.vertices.unbind();
+
+	glDrawArrays(GL_TRIANGLES, 0, casticsWrapper.vertices.count());
+
+	combineProgram.unbindAttribute();
+
+	casticsWrapper.frontCasticTex.unbind(GL_TEXTURE1);
+	casticsWrapper.backCasticTex.unbind(GL_TEXTURE0);
+	
+
+	combineProgram.unbind();
+
+	glEnable(GL_DEPTH_TEST);
+	casticsWrapper.combineFBO.unbind();
 
 }
 
@@ -1310,6 +1491,7 @@ void demo_render_cubemap() {
 
 		depthMapTex.bind(GL_TEXTURE3);
 		//transparentMap.bind(GL_TEXTURE4);
+		casticsWrapper.casticTex.bind(GL_TEXTURE4);
 
 		mainProg.bind();
 
@@ -1326,6 +1508,7 @@ void demo_render_cubemap() {
 
 		mainProg.unbind();
 
+		casticsWrapper.casticTex.unbind(GL_TEXTURE4);
 		//transparentMap.unbind(GL_TEXTURE4);
 		depthMapTex.unbind(GL_TEXTURE3);
 
@@ -1336,6 +1519,9 @@ void demo_render_cubemap() {
 
 void render_hub() {
 	glDisable(GL_DEPTH_TEST);
+	glEnable(GL_BLEND);
+
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
 	glm::mat4 proj = glm::ortho(0.0f, (float)ftw::get()->app.getWidth(), (float)ftw::get()->app.getHeight(), 0.0f);
 	glm::mat4 view = glm::mat4(1.0f);
@@ -1377,7 +1563,7 @@ void render_hub() {
 		hubProgram.uniformMat4("model", model);
 
 		//transparentMap.bind(GL_TEXTURE0);
-		depthMapTex.bind(GL_TEXTURE0);
+		casticsWrapper.casticTex.bind(GL_TEXTURE0);
 		hubProgram.bindAttributes();
 
 		hubVertices.bind();
@@ -1389,12 +1575,13 @@ void render_hub() {
 		glDrawArrays(GL_TRIANGLES, 0, hubVertices.count());
 
 		hubProgram.unbindAttribute();
-		depthMapTex.unbind(GL_TEXTURE0);
+		casticsWrapper.casticTex.unbind(GL_TEXTURE0);
 		//transparentMap.unbind(GL_TEXTURE0);
 	}
 
 	hubProgram.unbind();
 
+	glDisable(GL_BLEND);
 	glEnable(GL_DEPTH_TEST);
 }	
 
@@ -1479,6 +1666,8 @@ void demo_release() {
 	lightBuffer.release();
 	matricesBuffer.release();
 	
+	combineProgram.release();
+	casticProgram.release();
 	reflectiveProgram.release();
 	hubProgram.release();
 	shadowProg.release();
@@ -1564,6 +1753,42 @@ void drawShadowMesh(
 
 	shadowProg.unbindAttribute();
 }
+
+void drawCasticMesh(
+	mesh::OpenGLMesh& mesh,
+	TextureMaterial& tex,
+	const glm::mat4& model) {
+
+
+	casticProgram.uniformMat4("model", model);
+
+	glm::mat4 normalMatrix = glm::transpose(glm::inverse(model));
+
+	casticProgram.uniformMat4("normalMatrix", normalMatrix);
+
+	tex.normal.bind(GL_TEXTURE0);
+	casticProgram.bindAttributes();
+
+	mesh.vertices.bind();
+	casticProgram.ptr("vertices", 3, GL_FLOAT);
+	mesh.texCoords.bind();
+	casticProgram.ptr("texCoords", 2, GL_FLOAT);
+	mesh.normals.bind();
+	casticProgram.ptr("normals", 3, GL_FLOAT);
+	mesh.tangents.bind();
+	casticProgram.ptr("tangents", 3, GL_FLOAT);
+	mesh.biTangents.bind();
+	casticProgram.ptr("biTangents", 3, GL_FLOAT);
+	mesh.vertices.unbind();
+
+	mesh.index.bind();
+	glDrawElements(GL_TRIANGLES, mesh.index.count(), GL_UNSIGNED_INT, nullptr);
+	mesh.index.unbind();
+
+	casticProgram.unbindAttribute();
+	tex.normal.unbind(GL_TEXTURE0);
+}
+
 
 void drawSkybox(
 	mesh::OpenGLMesh& mesh,

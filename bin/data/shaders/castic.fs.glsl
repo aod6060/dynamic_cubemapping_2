@@ -22,12 +22,12 @@ void main() {
     } else {
         n = normalize(v_Normals);
     }
-
-    if(isBack) {
-        n = 1.0 - n;
-    }
     
     vec3 l = normalize(v_LightDir);
+
+    if(isBack) {
+        l = -l;
+    }
 
     float ndotl = max(dot(n, l), 0.0);
 

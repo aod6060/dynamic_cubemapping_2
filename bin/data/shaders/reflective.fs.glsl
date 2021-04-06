@@ -39,6 +39,7 @@ in vec2 v_TexCoords;
 
 uniform sampler2D shadowMap;
 //uniform sampler2D transMap;
+uniform sampler2D casticTex;
 
 uniform samplerCube refTex;
 uniform sampler2D normalMap;
@@ -92,6 +93,16 @@ vec4 transCalc(vec4 p) {
     return trans;
 }
 */
+
+vec4 casticTexCalc(vec4 p) {
+    vec3 projCoords = p.xyz / p.w;
+
+    projCoords = projCoords * 0.5 + 0.5;
+
+    vec4 trans = texture(casticTex, projCoords.xy);
+
+    return trans;
+}
 
 vec3 hurBlur(samplerCube s, vec3 tc, float blurSize) {
     vec3 sum = vec3(0.0);
@@ -173,7 +184,7 @@ void main() {
 
     vec3 R, R1, R2;
     vec3 color;
-    float ref = 1.1;
+    float ref = 1.0;
 
     if(envType == ENV_REFLECT) {
         R = reflect(I, n);
@@ -245,7 +256,7 @@ void main() {
 
     vec3 finalColor;
 
-    //vec4 trans = transCalc(v_FragPosLightSpace);
+    vec4 castic = casticTexCalc(v_FragPosLightSpace);
 
     /*
     if(trans.a > 0.0) {
@@ -256,7 +267,8 @@ void main() {
     */
 
     //finalColor = (a + (1.0 - mix(shadow, 1.0 - trans.a, 0.45)) * (d)) * color + s;
-    finalColor = (a + (1.0 - shadow) * (d)) * color + s;
+    //finalColor = (a + (1.0 - shadow) * (d)) * color + s;
+    finalColor = (a + (1.0 - shadow) * (d)) * color + s + ((1.0 - shadow) * castic.rgb * castic.a * diffuse * color);
     
     out_Color = vec4(finalColor, 1.0);
 }

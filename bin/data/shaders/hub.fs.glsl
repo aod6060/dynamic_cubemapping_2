@@ -11,9 +11,5 @@ void main() {
 
    vec4 color = texture(tex0, v_TexCoords);
 
-   if(color.a < 0.5) {
-       discard;
-   }
-
-   out_Color = vec4(color.rgb * color.a, color.a);
+   out_Color = vec4(color.rgb, color.a);
 }
