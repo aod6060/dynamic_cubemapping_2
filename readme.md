@@ -5,3 +5,7 @@ This is a remake of my original dynamic cubemapping demo from
 from 2014. Here is a link to the youtube video.
 
 https://www.youtube.com/watch?v=3wngkhdOfiI
+
+Here is an example of what to expect from this demo...
+
+![Example Image](./image_example.png)
