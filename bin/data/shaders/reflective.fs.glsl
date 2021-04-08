@@ -40,6 +40,7 @@ in vec2 v_TexCoords;
 uniform sampler2D shadowMap;
 //uniform sampler2D transMap;
 uniform sampler2D casticTex;
+uniform sampler2D casticDepthMap;
 
 uniform samplerCube refTex;
 uniform sampler2D normalMap;
@@ -85,18 +86,6 @@ float ShadowCalc(vec4 p) {
     return shadow;
 }
 
-/*
-vec4 transCalc(vec4 p) {
-    vec3 projCoords = p.xyz / p.w;
-
-    projCoords = projCoords * 0.5 + 0.5;
-
-    vec4 trans = texture(transMap, projCoords.xy);
-
-    return trans;
-}
-*/
-
 vec4 casticTexCalc(vec4 p) {
     vec3 projCoords = p.xyz / p.w;
 
@@ -105,6 +94,38 @@ vec4 casticTexCalc(vec4 p) {
     vec4 trans = texture(casticTex, projCoords.xy);
 
     return trans;
+}
+
+float casticShadowCalc(vec4 p) {
+    vec3 projCoords = p.xyz / p.w;
+
+    projCoords = projCoords * 0.5 + 0.5;
+
+    float closestDepth = texture(casticDepthMap, projCoords.xy).r;
+
+    float currentDepth = projCoords.z;
+
+    float bias = 0.005;
+
+    //float shadow = (currentDepth - bias> closestDepth) ? 1.0 : 0.0;
+
+    float shadow = 0.0;
+    vec2 texSize = 1.0 / textureSize(casticDepthMap, 0);
+
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcfDepth = texture(casticDepthMap, projCoords.xy + vec2(x, y) * texSize).r;
+            shadow += currentDepth - bias > pcfDepth ? 1.0 : 0.0;
+        }
+    }
+
+    shadow /= 9.0;
+
+    if(projCoords.z > 1.0) {
+        shadow = 0.0;
+    }
+
+    return shadow;
 }
 
 vec3 hurBlur(samplerCube s, vec3 tc, float blurSize) {
@@ -187,7 +208,7 @@ void main() {
 
     vec3 R, R1, R2;
     vec3 color;
-    float ref = 1.0;
+    float ref = refValue;
 
     if(envType == ENV_REFLECT) {
         R = reflect(I, n);
@@ -261,6 +282,11 @@ void main() {
 
     vec4 castic = casticTexCalc(v_FragPosLightSpace);
 
+    float casticShadow = casticShadowCalc(v_FragPosLightSpace);
+
+    float shadow2 = mix(shadow, casticShadow, 0.5);
+    float m = 0.5;
+
     /*
     if(trans.a > 0.0) {
         finalColor = (a + (1.0 - shadow) * (d) * (trans.rgb * trans.a)) * color + s;
@@ -271,7 +297,7 @@ void main() {
 
     //finalColor = (a + (1.0 - mix(shadow, 1.0 - trans.a, 0.45)) * (d)) * color + s;
     //finalColor = (a + (1.0 - shadow) * (d)) * color + s;
-    finalColor = (a + (1.0 - shadow) * (d)) * color + s + ((1.0 - shadow) * castic.rgb * castic.a * diffuse * color);
+    finalColor = (a + (1.0 - shadow) * (1.0 - casticShadow) * (d)) * color + s + ((1.0 - shadow) * ((castic.rgb + color) * 0.5) * castic.a) + ((1.0 - shadow) * (castic.rgb) * pow(castic.a, 4.0));
     
-    out_Color = vec4(finalColor, 1.0);
+    out_Color = vec4(finalColor * surfaceColor, 1.0);
 }

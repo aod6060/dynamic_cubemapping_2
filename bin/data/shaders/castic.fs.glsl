@@ -5,6 +5,9 @@ uniform bool isNormalMapped;
 
 uniform bool isBack;
 
+uniform vec3 surfaceColor;
+uniform float refValue; // 0.5 ~ 1.1
+
 in vec2 v_TexCoords;
 in vec3 v_Normals;
 in vec3 v_LightDir;
@@ -31,5 +34,5 @@ void main() {
 
     float ndotl = max(dot(n, l), 0.0);
 
-    out_Color = vec4(vec3(1.0), ndotl);
+    out_Color = vec4(surfaceColor, ndotl);
 }

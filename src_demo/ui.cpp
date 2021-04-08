@@ -717,7 +717,7 @@ namespace ui {
 
 			glm::vec2 mcv = glm::vec2(mc.x, mc.y);
 
-			r.init(this->position - glm::vec2(1.0f, 0.0f), this->size);
+			r.init(this->position - glm::vec2(1.0f, 0.0f), glm::vec2(size.x, 16.0f));
 
 			if (r.isCollision(mcv)) {
 				if (min + position.x <= mc.x && max + position.x >= mc.x) {
@@ -746,9 +746,9 @@ namespace ui {
 		ui::textSize(ss.str(), width, height);
 		glm::vec2 size = glm::vec2(width, height);
 
-		glm::vec2 sliderSize = glm::vec2(100.0f, height);
+		glm::vec2 sliderSize = glm::vec2(100.0f, 16.0f);
 
-		glm::vec2 nobSize = glm::vec2(8.0f, height);
+		glm::vec2 nobSize = glm::vec2(8.0f, 16.0);
 
 		// Render Background
 		ui::setColor(this->backgroundColor);

@@ -68,6 +68,9 @@ struct MainProgram : public rend::Program {
 		this->createUniform("casticTex");
 		this->uniform1("casticTex", 4);
 
+		this->createUniform("casticDepthMap");
+		this->uniform1("casticDepthMap", 5);
+
 		/*
 		this->createUniform("transMap");
 		this->uniform1("transMap", 4);
@@ -204,6 +207,9 @@ struct ReflectiveProgram : public rend::Program {
 		this->createUniform("casticTex");
 		this->uniform1("casticTex", 4);
 
+		this->createUniform("casticDepthMap");
+		this->uniform1("casticDepthMap", 5);
+
 		this->createUniform("refTex");
 		this->uniform1("refTex", 0);
 
@@ -259,6 +265,9 @@ struct CasticProgram : public rend::Program {
 
 		this->createUniform("isNormalMapped");
 		this->createUniform("isBack");
+
+		this->createUniform("surfaceColor");
+		this->createUniform("refValue");
 
 		// Attributes
 		this->createAttributes("vertices", 0);
@@ -615,7 +624,7 @@ static bool canUpdate = false;
 static bool usingPath = false;
 
 static glm::vec3 surfaceColor = glm::vec3(0.0f);
-static float refValue = 0.5f;
+static float refValue = 0.5f; // 0.5f ~ 1.1f
 
 static ui::UIContainer container;
 
@@ -632,6 +641,8 @@ static ui::Label colorSection;
 static ui::Slider redSlider;
 static ui::Slider greenSlider;
 static ui::Slider blueSlider;
+static ui::Label refractIndexSection;
+static ui::Slider refractIndex;
 
 void drawMesh(
 	mesh::OpenGLMesh& mesh, 
@@ -1047,7 +1058,7 @@ void demo_init(ft::Table* table) {
 
 	// static ui::Label colorSection;
 	colorSection.setText("Surface Color");
-	colorSection.setColor(glm::vec4(0.0f, 0.0f, 0.0f, 1.0f));
+	colorSection.setColor(glm::vec4(1.0f));
 	colorSection.setPosition(glm::vec2(32.0f, 320.0f));
 
 	// Red slider
@@ -1055,18 +1066,44 @@ void demo_init(ft::Table* table) {
 	redSlider.setBackgroundColor(glm::vec4(0.5f, 0.5, 0.5f, 1.0f));
 	redSlider.setNobColor(glm::vec4(0.75f, 0.0f, 0.0f, 1.0f));
 	redSlider.setPositions(glm::vec2(32.0f, 352.0f));
+	redSlider.setAction([&](ui::IAction* a) {
+		surfaceColor.r = redSlider.getValue();
+	});
 
 	// Green slider
 	greenSlider.setColor(glm::vec4(0.0f, 1.0f, 0.0f, 1.0f));
 	greenSlider.setBackgroundColor(glm::vec4(0.5f, 0.5, 0.5f, 1.0f));
 	greenSlider.setNobColor(glm::vec4(0.0f, 0.75f, 0.0f, 1.0f));
 	greenSlider.setPositions(glm::vec2(32.0f, 384.0f));
+	greenSlider.setAction([&](ui::IAction* a) {
+		surfaceColor.g = greenSlider.getValue();
+	});
 
 	// Blue slider
 	blueSlider.setColor(glm::vec4(0.0f, 0.0f, 1.0f, 1.0f));
 	blueSlider.setBackgroundColor(glm::vec4(0.5f, 0.5, 0.5f, 1.0f));
 	blueSlider.setNobColor(glm::vec4(0.0f, 0.0f, 0.75f, 1.0f));
 	blueSlider.setPositions(glm::vec2(32.0f, 416.0f));
+	blueSlider.setAction([&](ui::IAction* a) {
+		surfaceColor.b = blueSlider.getValue();
+	});
+
+	// Refract Index Section
+	refractIndexSection.setText("Refract Index Section");
+	refractIndexSection.setColor(glm::vec4(1.0f));
+	refractIndexSection.setPosition(glm::vec2(32.0f, 448.0f));
+
+	// Refract Index
+	refractIndex.setColor(glm::vec4(1.0f));
+	refractIndex.setBackgroundColor(glm::vec4(glm::vec3(0.5f), 1.0f));
+	refractIndex.setNobColor(glm::vec4(glm::vec3(0.75f), 1.0f));
+	refractIndex.setPositions(glm::vec2(32.0f, 480.0f));
+	refractIndex.setMinRange(0.5f);
+	refractIndex.setMaxRange(1.1f);
+
+	refractIndex.setAction([&](ui::IAction* a) {
+		refValue = refractIndex.getValue();
+	});
 
 	container.add(&showDepthCB);
 	container.add(&showCasticMapCB);
@@ -1081,6 +1118,8 @@ void demo_init(ft::Table* table) {
 	container.add(&redSlider);
 	container.add(&greenSlider);
 	container.add(&blueSlider);
+	container.add(&refractIndexSection);
+	container.add(&refractIndex);
 
 	container.init();
 
@@ -1138,6 +1177,7 @@ void demo_render_scene() {
 	depthMapTex.bind(GL_TEXTURE3);
 	//transparentMap.bind(GL_TEXTURE4);
 	casticsWrapper.casticTex.bind(GL_TEXTURE4);
+	casticsWrapper.depthBuffer.bind(GL_TEXTURE5);
 
 	mainProg.bind();
 
@@ -1182,6 +1222,9 @@ void demo_render_scene() {
 	reflectiveProgram.uniformMat4("normalMatrix", normalMatrix);
 	reflectiveProgram.uniform3("cameraPos", camera.position.x, camera.position.y, camera.position.z);
 
+	reflectiveProgram.uniform3("surfaceColor", surfaceColor.r, surfaceColor.g, surfaceColor.b);
+	reflectiveProgram.uniform1("refValue", refValue);
+
 	reflectiveProgram.bindAttributes();
 
 	meshes[mIndex]->vertices.bind();
@@ -1207,6 +1250,7 @@ void demo_render_scene() {
 	dirtTM.normal.unbind(GL_TEXTURE1);
 	dynamicCubemap.unbind(GL_TEXTURE0);
 	casticsWrapper.casticTex.unbind(GL_TEXTURE4);
+	casticsWrapper.depthBuffer.unbind(GL_TEXTURE5);
 	//transparentMap.unbind(GL_TEXTURE4);
 	depthMapTex.unbind(GL_TEXTURE3);
 }
@@ -1311,6 +1355,8 @@ void demo_render_castic() {
 	
 	casticProgram.uniform1("isBack", false);
 
+	casticProgram.uniform3("surfaceColor", surfaceColor.r, surfaceColor.g, surfaceColor.b);
+
 	if (envType == ENV_REFRACT || envType == ENV_GLASS) {
 		if (usingPath) {
 			drawCasticMesh(
@@ -1394,7 +1440,7 @@ void demo_render_castic() {
 	combineProgram.uniformMat4("proj", proj);
 	combineProgram.uniformMat4("view", view);
 	combineProgram.uniformMat4("model", model);
-	combineProgram.uniform1("value", 0.85f);
+	combineProgram.uniform1("value", 0.5f);
 
 	casticsWrapper.backCasticTex.bind(GL_TEXTURE0);
 	casticsWrapper.frontCasticTex.bind(GL_TEXTURE1);
@@ -1517,6 +1563,7 @@ void demo_render_cubemap() {
 		depthMapTex.bind(GL_TEXTURE3);
 		//transparentMap.bind(GL_TEXTURE4);
 		casticsWrapper.casticTex.bind(GL_TEXTURE4);
+		casticsWrapper.depthBuffer.bind(GL_TEXTURE5);
 
 		mainProg.bind();
 
@@ -1534,6 +1581,8 @@ void demo_render_cubemap() {
 		mainProg.unbind();
 
 		casticsWrapper.casticTex.unbind(GL_TEXTURE4);
+		casticsWrapper.depthBuffer.unbind(GL_TEXTURE5);
+
 		//transparentMap.unbind(GL_TEXTURE4);
 		depthMapTex.unbind(GL_TEXTURE3);
 
