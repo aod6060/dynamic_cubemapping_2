@@ -145,13 +145,13 @@ void main() {
 
     vec3 finalColor;
 
-    vec4 castic = casticTexCalc(v_FragPosLightSpace);
-    float casticShadow = casticShadowCalc(v_FragPosLightSpace);
+    //vec4 castic = casticTexCalc(v_FragPosLightSpace);
+    //float casticShadow = casticShadowCalc(v_FragPosLightSpace);
 
     //float shadow2 = (shadow + casticShadow) * 0.5;
-    float shadow2 = (shadow + casticShadow) * 0.5;
+    //float shadow2 = (shadow + casticShadow) * 0.5;
 
-    float m = 0.5;
+    //float m = 0.5;
 
     /*
     if(trans.a > 0.0) {
@@ -162,7 +162,8 @@ void main() {
     */
 
     //finalColor = (a + (1.0 - mix(shadow, 1.0 - trans.a, 0.45)) * (d)) * color + s;
-    finalColor = (a + (1.0 - shadow) * (1.0 - casticShadow) * (d)) * color + s + ((1.0 - shadow) * ((castic.rgb + color) * 0.5) * castic.a) + ((1.0 - shadow) * (castic.rgb) * pow(castic.a, 4.0));
+    //finalColor = (a + (1.0 - shadow) * (1.0 - casticShadow) * (d)) * color + s + ((1.0 - shadow) * ((castic.rgb + color) * 0.5) * castic.a) + ((1.0 - shadow) * (castic.rgb) * pow(castic.a, 4.0));
+    finalColor = (a + (1.0 - shadow) * d) * color + s;
     
     //out_Color = vec4(n, 1.0)
     out_Color = vec4(finalColor, 1.0);
